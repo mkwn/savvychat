@@ -21,7 +21,8 @@ import re
 
 import traceback
 
-EXTRAPOSTS = 10 #number of posts recieved before last unread. CANNOT BE ZERO
+MAXPOSTS = 30 #max number of posts initialized
+EXTRAPOSTS = 10 #number of posts recieved when "view older" is checked. CANNOT BE ZERO
 
 #http://stackoverflow.com/questions/2350454/simplest-way-to-store-a-value-in-google-app-engine-python
 class Global(db.Model):
@@ -296,6 +297,7 @@ class MainPage(webapp.RequestHandler):
 					chatuser.name=name
 					chatuser.email=email
 					chatuser.put()
+					chatuser.lastonline = datetime(2000,1,1) #so we load every message for them
 					break
 		
 		#get unread posts
@@ -308,31 +310,19 @@ class MainPage(webapp.RequestHandler):
 		#the cursor saves the position in the query. However for some reason the cursor needs to be created on the post /before/ the cursor position.
 		for post in postsData:
 			showarchive = True
+			if len(posts) == MAXPOSTS:
+				#stop sending posts
+				break
 			if post.date < chatuser.lastonline:
 				#this post is too old
 				if len(posts) == 0:
 					#we should at least show one post
-					showarchive = False
+					pass
 				else:
 					break
 			posts = posts+[makePostObject(post)]
 			querycursor = postsData.cursor() #but it's inefficient to keep overwriting the cursor...
-				
-		"""for post in postsData:
-			if breakTime:
-				showarchive = True
-				break
-			if countdown == 1:
-				querycursor = postsData.cursor() #i don't actually understand this
-			if countdown == 0:
-				breakTime = True
-				continue
-			posts = posts+[makePostObject(post)]
-			if countdown > 0:
-				countdown = countdown - 1
-				continue
-			if post.date < chatuser.lastonline:
-				countdown = EXTRAPOSTS - 1"""
+			showarchive = False
 				
 		#make token
 		suffix = 0
