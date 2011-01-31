@@ -107,9 +107,9 @@ def resolveStragglers():
 	#if a computer crashes, they will not be able to send the onClose message
 	#look for users with no updates in 2 hours and close them
 	chatusers = db.GqlQuery("SELECT * FROM Chatuser")
-	now=datetime.now()
+	now = datetime.now()
 	for chatuser in chatusers:
-		expired=False
+		expired = False
 		for idx, lastrefresh in enumerate(chatuser.lastrefreshlist):
 			if (now-lastrefresh).seconds > 60*60*2+120:
 				#expired

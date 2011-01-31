@@ -18,6 +18,15 @@ h3,h4{
 margin-bottom: 5px;
 }
 
+hr{
+color: #EEE;
+background-color: #EEE;
+height: 3px;
+border: None;
+margin-left:20px;
+margin-right:20px;
+margin-bottom:0;
+}
 #preview .code{
 background-color: #BBF;
 }
@@ -693,6 +702,10 @@ function recievePost(post,ignoretopics,prepend){
 			if(parsedObj.html != ""){
 				if(postlist.lastChild.childNodes[1].innerHTML == parsedObj.authortext){
 					newdiv.childNodes[1].style.display = "None";
+					newdiv.style.marginTop = "0";
+					//newdiv.style.paddingTop = "0";
+					//postlist.lastChild.style.paddingBottom = "0";
+					//postlist.lastChild.innerHTML += "<hr />";
 				}
 			}
 		}
@@ -704,6 +717,10 @@ function recievePost(post,ignoretopics,prepend){
 			if(parsedObj.html != ""){
 				if(postlist.firstChild.childNodes[1].innerHTML == parsedObj.authortext){
 					postlist.firstChild.childNodes[1].style.display = "None";
+					postlist.firstChild.style.marginTop = "0";
+					//postlist.firstChild.style.paddingTop = "0";
+					//newdiv.style.paddingBottom = "0";
+					//newdiv.innerHTML += "<hr />";
 				}
 			}
 		}
