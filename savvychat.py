@@ -133,7 +133,7 @@ def getUserFromName(name):
 	
 def makePostObject(post):
 	#convert instance of post class to object ready for JSON
-	author=getUserFromId(post.author)
+	author = getUserFromId(post.author)
 	if not author:
 		author = post.author
 	else:
@@ -201,25 +201,16 @@ class RetrievePage(webapp.RequestHandler):
 		#there is a request for more of the post archive
 		cursor = self.request.get('c')
 		postsData = db.GqlQuery("SELECT * FROM Post ORDER BY date DESC").with_cursor(cursor)
-		countdown = EXTRAPOSTS
 		posts = []
-		breakTime = False
 		showarchive = False
 		querycursor = ""
 		for post in postsData:
-			if breakTime:
+			if len(posts) == EXTRAPOSTS:
+				#we are done
 				showarchive = True
-				break
-			if countdown == 1:
-				querycursor = postsData.cursor() #i don't actually understand this
-			if countdown == 0:
-				breakTime = True
-				continue
-			posts = posts+[makePostObject(post)]
-			if countdown > 0:
-				countdown = countdown - 1
-				continue
-		
+				break;
+			posts = posts + [makePostObject(post)]
+			querycursor = postsData.cursor() #but it's inefficient to keep overwriting the cursor...
 		#postList = postsData.fetch(EXTRAPOSTS)
 		message = simplejson.dumps({'posts':posts,'cursor':querycursor,'showarchive':showarchive})
 		channel.send_message(self.request.get('t'), message)
@@ -293,7 +284,7 @@ class MainPage(webapp.RequestHandler):
 			whitelist = whitelistData.readlines()
 			whitelistData.close()
 			for emailData in whitelist+[""]:
-				if emailData.rstrip()=="":
+				if emailData.rstrip() == "":
 					#not in whitelist
 					self.response.out.write(template.render('deny.htm', {'logouturl':logouturl}))
 					return
@@ -307,14 +298,27 @@ class MainPage(webapp.RequestHandler):
 					chatuser.put()
 					break
 		
-		#get unread posts, plus EXTRAPOSTS more
+		#get unread posts
 		postsData = db.GqlQuery("SELECT * FROM Post ORDER BY date DESC")
 		posts = []
-		breakTime = False
-		countdown = -1
+		#breakTime = False
+		#countdown = -1
 		showarchive = False
 		querycursor = ""
+		#the cursor saves the position in the query. However for some reason the cursor needs to be created on the post /before/ the cursor position.
 		for post in postsData:
+			showarchive = True
+			if post.date < chatuser.lastonline:
+				#this post is too old
+				if len(posts) == 0:
+					#we should at least show one post
+					showarchive = False
+				else:
+					break
+			posts = posts+[makePostObject(post)]
+			querycursor = postsData.cursor() #but it's inefficient to keep overwriting the cursor...
+				
+		"""for post in postsData:
 			if breakTime:
 				showarchive = True
 				break
@@ -328,7 +332,7 @@ class MainPage(webapp.RequestHandler):
 				countdown = countdown - 1
 				continue
 			if post.date < chatuser.lastonline:
-				countdown = EXTRAPOSTS - 1
+				countdown = EXTRAPOSTS - 1"""
 				
 		#make token
 		suffix = 0

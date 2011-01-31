@@ -6,18 +6,14 @@ resend token on expiry
 1MB limit beats really long posts
 	split into multiple messages with special metadata so client knows to join
 	in the meantime, give a warning and don't clear the field
-don't load read messages
-warn on IE6
 secure to prevent impersonation etc.
 autosend messages that happen between page load and onopen (use cursor)
 ping on call
 set lastonline parameter for new user
 logoff should close token
 merge posts with same author
-don't send post with unknown meta
 |flushtokens
 dont send read messages
-make the alert sound play once and not bing for each message
 more margin around datelabel/previewlabel
 
 DISTANT

@@ -238,6 +238,9 @@ text-align: center;
 display: none;
 }
 </style>
+<!--[if lt IE 7]>
+        <script type="text/javascript">alert("SavvyChat will almost certainly not work on your browser");</script>
+<![endif]-->
 <script type="text/javascript" src="json2.js"></script>
 <script type="text/javascript" src='/_ah/channel/jsapi'></script>
 {% if not disableMath %}
@@ -423,18 +426,20 @@ function setIcon(path){
 	document.body.removeChild(shim);
 }
 
+var alerted = false;
 //on recieving any message from the server
 function onMessage(message){
 	var m = JSON.parse(message.data);
 	if(m.content){
 		//this was a post
 		recievePost(m);
-		if(!windowFocus){
+		if(!windowFocus&&!alerted){
 			setIcon("alert.ico");
 			document.title="* SavvyChat";
 			if(!disableAlert){
 				playAlert();
 			}
+			alerted = true;
 		}
 		return;
 	}
@@ -738,45 +743,18 @@ function getHTMLfromSavvyCode(savvyCode, domath, author){
 		meta = RegExp.$1;
 		worktext = RegExp.$3;
 		meta = meta.toLowerCase().replace(/\s/g,"");
-		if(meta == "topic"){
+		parts = meta.split(":");
+		var str;//helper string for some options
+		switch (parts[0]){
+		case "topic":
 			//topics don't have any multiline stuff
 			worktext = worktext.replace(/\n/g," ");
 			authortext = author + " changed topic: ";
-		}
-		if(meta == "img"){
+			break
+		case "img":
 			return {meta:'img',html:'<img onerror="setTimeout(&quot;scrollDown()&quot;,1);" onload="setTimeout(&quot;scrollDown()&quot;,1);" src="' + worktext.replace(/\n/g,"") + '" />', authortext:authortext};
-		}
-		
-		//check for options
-		if(meta == "logout"){
-			return {meta:'logout',html:'<strong>Special command to log out (will not send)</strong>', authortext:authortext};
-		}
-		if(meta == "help"){
-			return {meta:'help',html:'<strong>Special command to show help (will not send)</strong>', authortext:authortext};
-		}
-		var str;
-		if(meta == "hf"){
-			str = "hide header and footer";
-			if(!verbose)str = "show header and footer as normal";
-			return {meta:'hf',html:'<strong>Special command to '+str+' (will not send)</strong>', authortext:authortext};
-		}
-		if(meta == "tone"){
-			str = "enable";
-			if(!disableAlert)str = "disable";
-			return {meta:'tone',html:'<strong>Special command to '+str+' the alert tone (will not send)</strong>', authortext:authortext};
-		}
-		if(meta == "preview"){
-			str = "enable"
-			if(dopreview)str = "disable";
-			return {meta:'preview',html:'<strong>Special command to '+str+' the preview (will not send)</strong>', authortext:authortext};
-		}
-		if(meta == "math"){
-			str = "enable"
-			if(mathpreview)str = "disable";
-			return {meta:'math',html:'<strong>Special command to '+str+' live previewing of math (will not send)</strong>', authortext:authortext};
-		}
-		parts = meta.split(":");
-		if(parts[0] == "call"){
+			break;
+		case "call":
 			var recipientText;
 			if(parts.length == 1){
 				recipientText = "all";
@@ -785,6 +763,38 @@ function getHTMLfromSavvyCode(savvyCode, domath, author){
 				recipientText = parts.join(":").replace(/,/g,", ");
 			}
 			authortext = author + " calls "+ recipientText + ": ";
+			break;
+			
+		//check for options
+		case "logout":
+			return {meta:'logout',html:'<strong>Special command to log out (will not send)</strong>', authortext:authortext};
+			break;
+		case "help":
+			return {meta:'help',html:'<strong>Special command to show help (will not send)</strong>', authortext:authortext};
+			break;
+		case "hf":
+			str = "hide header and footer";
+			if(!verbose) str = "show header and footer as normal";
+			return {meta:'hf',html:'<strong>Special command to '+str+' (will not send)</strong>', authortext:authortext};
+			break;
+		case "tone":
+			str = "enable";
+			if(!disableAlert) str = "disable";
+			return {meta:'tone',html:'<strong>Special command to '+str+' the alert tone (will not send)</strong>', authortext:authortext};
+			break;
+		case "preview":
+			str = "enable"
+			if(dopreview)str = "disable";
+			return {meta:'preview',html:'<strong>Special command to '+str+' the preview (will not send)</strong>', authortext:authortext};
+			break;
+		case "math":
+			str = "enable"
+			if(mathpreview)str = "disable";
+			return {meta:'math',html:'<strong>Special command to '+str+' live previewing of math (will not send)</strong>', authortext:authortext};
+			break
+		default:
+			return {meta:meta,html:'<strong>Unknown tag &quot;'+parts[0]+'&quot;</span></strong>', authortext:authortext};
+			break;
 		}
 	}
 	
@@ -1117,15 +1127,18 @@ function onBlur (){
 }
 function onFocus(){
 	windowFocus = true;
-	setIcon("favicon.ico");
-	//chrome bug: http://heyman.info/2010/oct/7/google-chrome-bug-when-setting-document-title/
-	setTimeout(function() {
-			document.title = "SavvyChat";
-		}, 100);
+	if(alerted){
+		setIcon("favicon.ico");
+		//chrome bug: http://heyman.info/2010/oct/7/google-chrome-bug-when-setting-document-title/
+		setTimeout(function() {
+				document.title = "SavvyChat";
+			}, 100);
+		alerted = false;
+	}
 }
 //these need to be set outside of onloadbody lest it get out of sync before the page loads
 if(document.onfocusin === null){
-	//IE needs its own special method to detect window focus, poor mentally disabled child
+	//IE needs its own special method to detect window focus or it gets confused with the textarea, poor mentally disabled child
 	document.onfocusin = onFocus;
 	document.onfocusout = onBlur;
 }else{
