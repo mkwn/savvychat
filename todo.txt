@@ -29,6 +29,7 @@ gmail gadget
 		when it closes bring the gadget version back
 	when gadget is minimized, disable
 	dynamic resizing with |+ and |-
+	scroll title tickertape style
 replace "kwan" with "me" etc
 sending a mail to savvychat mailer forwards the mail to savvychat
 	escape backticks so can put email in code block
