@@ -1,5 +1,4 @@
 IMMEDIATE
-if there's just 1 message unread it won't show "view older"
 limit topic length
 resend token on expiry
 	as well as the token, all posts in the downtime should be resent (use cursor)
@@ -9,7 +8,6 @@ resend token on expiry
 secure to prevent impersonation etc.
 autosend messages that happen between page load and onopen (use cursor)
 ping on call
-set lastonline parameter for new user
 logoff should close token
 merge posts with same author
 |flushtokens
