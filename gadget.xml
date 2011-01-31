@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" ?> 
+<Module> 
+<ModulePrefs
+	title="SavvyChat" 
+	title_url="http://savvychat.appspot.com/" 
+	description="SavvyChat Gadget"
+	height="400"
+	author="Matthew Kwan"
+>
+<Require feature="dynamic-height"/>
+<Require feature="views" />
+<Require feature="settitle" />
+</ModulePrefs>
+
+<Content type="url" href="http://savvychat.appspot.com/?gadget=true" view="home, profile"/>
+<Content type="url" href="http://savvychat.appspot.com" view="default, canvas"/>
+</Module>

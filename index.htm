@@ -1,0 +1,1203 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<!--The reason there are two icon tags here is because there's a quirk in chrome where the favicon will not change unless both the icon and shortcut icon tags are changed-->
+<link rel="shortcut icon" id="sicon" href="favicon.ico" />
+<link rel="icon" id="icon" href="favicon.ico" />
+<link type="text/css" rel="stylesheet" href="/stylesheets/main.css" />
+<style type="text/css">
+body{
+overflow:hidden;
+margin:0;
+}
+h1,h2,h3,h4{
+margin-top: 0;
+}
+h3,h4{
+margin-bottom: 5px;
+}
+
+#preview .code{
+background-color: #BBF;
+}
+.callpost .code{
+background-color: #FB9;
+}
+.topicpost .code{
+background-color: #BF9;
+}
+#topic .code{
+background-color: #DDD;
+}
+div.mathplaceholderblock{
+font-family: Courier New, monospace;
+text-align:center;
+}
+span.mathplaceholderinline{
+font-family: Courier New, monospace;
+}
+
+blockquote{
+border:solid;
+border-left:none;
+border-right:none;
+border-color:#EEE;
+border-width:2px;
+margin-left:20px;
+margin-right:20px;
+}
+#preview blockquote{
+border-color: #BBF;
+}
+.callpost blockquote{
+border-color: #FB9;
+}
+
+#loadingContainer{
+text-align: center;
+}
+#loadingContent{
+text-align: center;
+margin-left: auto ;
+margin-right: auto ;
+width: 150px;
+background-color:#FFF;
+border:solid;
+border-top:none;
+border-color:#DDD;
+border-width:3px;
+}
+
+#container{
+text-align: center;
+}
+#content{
+text-align: left;
+margin-left: auto ;
+margin-right: auto ;
+width: 900px;
+position: relative;
+{% if not gadget %}
+background-color:#FFF;
+{% endif %}
+border:solid;
+border-top:none;
+border-bottom:none;
+border-color:#DDD;
+border-width:3px;
+}
+#header, #archive, #compose, #footer{
+padding: 10px;
+{% if gadget %}
+padding-left: 0px;
+padding-right: 0px;
+{% endif %}
+}
+
+#header{
+text-align: center;
+padding-bottom:30px;
+}
+.headerLeft{
+position:absolute;
+width:200px;
+text-align:right;
+right:10px;
+}
+#subtitle{
+position:absolute;
+width:900px;
+left:0;
+}
+#helpTag{
+position:absolute;
+width:200px;
+text-align:left;
+left:10px;
+}
+#logoutTag{
+position:absolute;
+width:200px;
+text-align:right;
+right:10px;
+}
+
+#archive{
+{% if not gadget %}
+background-color:#EEE;
+{% endif %}
+}
+#topic{
+{% if gadget %}
+background-color:#FFF;
+padding-top:4px;
+padding-left:5px;
+padding-right:5px;
+-moz-border-radius: 5px;
+border-radius: 5px;
+{% endif %}
+font-weight:bold;
+margin-bottom:15px;
+height:20px;
+overflow:hidden;
+}
+#topic strong{
+font-size:120%;
+}
+#postlist{
+overflow: auto;
+overflow-x:hidden;
+width:880px;
+height:400px;
+}
+.post{
+background-color:#FFF;
+padding: 10px;
+{% if gadget %}
+-moz-border-radius: 5px;
+border-radius: 5px;
+padding: 5px;
+{% endif %}
+margin-top:3px;
+
+white-space: pre-wrap;      /* CSS3 */   
+white-space: -moz-pre-wrap; /* Firefox */    
+white-space: -pre-wrap;     /* Opera before 7 */
+white-space: -o-pre-wrap;   /* Opera 7 */    
+word-wrap: break-word;      /* IE */
+
+}
+.author{
+
+font-weight:bold;
+margin-bottom:5px;
+}
+.datelabel{
+margin-left:5px;
+float:right;
+text-align:right;
+font-size:70%;
+{% if gadget %}
+display:None;
+{% endif %}
+}
+.callpost{
+background-color:#FDC;
+}
+.topicpost{
+background-color:#EFD;
+}
+#previewpost{
+background-color:#DDF;
+}
+#previewlabel{
+float:right;
+text-align:right;
+color:#669;
+}
+/*.postcontent{
+white-space
+}*/
+
+#compose{
+{% if not gadget %}
+background-color:#DDD;
+{% endif %}
+}
+#composefield{
+{% if gadget %}
+-moz-border-radius: 5px;
+border-radius: 5px;
+margin-top:-5px;
+{% endif %}
+-webkit-box-sizing:border-box;
+-moz-box-sizing:border-box;
+box-sizing:border-box;
+width:880px;
+height:100px;
+margin-bottom:10px;
+}
+#controls{
+{% if gadget %}
+-moz-border-radius: 5px;
+border-radius: 5px;
+background-color:#FFF;
+{% endif %}
+}
+#postbutton{
+height:50px;
+width:150px;
+}
+
+#footer{
+text-align: center;
+}
+
+#container{
+display: none;
+}
+</style>
+<script type="text/javascript" src="json2.js"></script>
+<script type="text/javascript" src='/_ah/channel/jsapi'></script>
+{% if not disableMath %}
+<script type="text/javascript" src="http://mathjax.org/mathjax/MathJax.js">
+MathJax.Hub.Config({
+        extensions: ["tex2jax.js","TeX/AMSmath.js", "TeX/AMSsymbols.js", "TeX/autobold.js","TeX/noUndefined.js"],
+		{% if gadget %}
+		messageStyle: "none",
+		{% endif %}
+		skipStartupTypeset: true,
+        jax: ["input/TeX", "output/HTML-CSS"],
+        tex2jax: {
+            inlineMath: [ ["\\(","\\)"] ],
+            displayMath: [ ['$$','$$'] ]
+        },
+        "HTML-CSS": { availableFonts: ["TeX"] }
+    });
+</script>
+{% endif %}
+<script type="text/javascript">
+//MathJax.Hub.Config({  tex2jax: {processEscapes: true}  });
+//MathJax.Hub.Config({  extensions: ["TeX/AMSmath.js", "TeX/AMSsymbol.js", "TeX/autobold.js","TeX/noUndefined.js"]  });
+{
+//some global variables
+var token = '{{ token }}';
+var tokenid = '{{ tokenid }}';
+var userid = '{{ userid }}';
+var username = '{{ name }}';
+var disableAlert = false;
+{% if disableAlert %}
+disableAlert = true;
+{% endif %}
+var gadget = false;
+{% if gadget %}
+gadget = true;
+{% endif %}
+var dopreview = true;
+var mathpreview = true;
+var disableMath = false;
+{% if disableMath %}
+disableMath = true;
+{% endif %}
+if(gadget){
+	dopreview = false;
+}
+var verbose = true;//this specifies whether the header and footer are shown
+var currPostID = 0;
+var querycursor = '{{ querycursor }}';
+var disableSend = false
+var windowFocus = true;
+var socket;
+}
+
+//http://www.geekdaily.net/2007/07/04/javascript-cross-browser-window-size-and-centering/
+function windowHeight(){
+	if(!window.innerWidth)	{
+		//IE
+		if(!(document.documentElement.clientWidth == 0)){
+			//strict mode
+			return document.documentElement.clientHeight;
+		}else{
+			//quirks mode
+			return document.body.clientHeight;
+		}
+	}else{
+		//w3c
+		return window.innerHeight;
+	}
+}
+function windowWidth(){
+	if(!window.innerWidth)	{
+		//IE
+		if(!(document.documentElement.clientWidth == 0)){
+			//strict mode
+			return document.documentElement.clientWidth;
+		}else{
+			//quirks mode
+			return document.body.clientWidth;
+		}
+	}else{
+		//w3c
+		return window.innerWidth;
+	}
+}
+
+//open a communication channel
+function openChannel(){
+	var channel = new goog.appengine.Channel(token);
+	socket = channel.open();
+	socket.onopen = onOpen;
+	socket.onclose = onClose;
+	socket.onerror = onClose;
+	socket.onmessage = onMessage;
+}
+
+//send any message to server
+function sendMessage(path, opt_param){
+		path += '?u='+ userid+'&t='+tokenid;
+		if (opt_param){
+			path += '&' + opt_param;
+		}
+		var xhr = new XMLHttpRequest();
+		xhr.open('POST', path, true);
+		xhr.send();
+		return xhr;
+}
+
+//on establishing a connection
+function onOpen(){
+	sendMessage('/opened');
+}
+
+//when the connection expires
+function onClose(){
+	socket.onclose = function(){};
+	socket.onerror = function(){};
+	socket.close();
+	var xhr = sendMessage('/token');
+	xhr.onreadystatechange = function(){
+		if(xhr.readyState == 4){
+			xhr.onreadystatechange = function(){};
+			var arr = xhr.responseText.split("@@")
+			tokenid = arr.shift();
+			token = arr.join("@@");
+			openChannel();
+			document.getElementById('postbutton').disabled = false;
+			disableSend = false;
+		}
+	};
+	//sendMessage('/closed');
+	document.getElementById('postbutton').disabled = true;
+	disableSend = true;
+	alert("SavvyChat session expired or broke.");
+}
+
+var snd;
+function playAlert(){
+	//play sound
+	if(typeof(Audio) == 'undefined'){
+		//this only works in IE
+		snd.src = "alert.wav";
+	}else{
+		//HTML5 version
+		snd.play();
+		snd = new Audio("alert.wav");
+	}
+}
+
+//helper function for setIcon
+function newIconLink(path,id,rel){
+	var head = document.getElementsByTagName("head")[0];
+	head.removeChild(document.getElementById(id));
+	
+	var newIcon = document.createElement("link");
+	newIcon.rel = rel;
+	newIcon.id = id;
+	newIcon.type = "image/x-icon";
+	newIcon.href = path;
+	head.appendChild(newIcon);
+}
+
+//http://softwareas.com/dynamic-favicons
+//set the favicon (as an alert)
+function setIcon(path){
+	//first, check browser is not IE8 or older, where this is not possible
+	//http://obvcode.blogspot.com/2007/11/easiest-way-to-check-ie-version-with.html
+	var version = 999; // we assume a sane browser
+    if (navigator.appVersion.indexOf("MSIE") != -1)
+		// bah, IE again, lets downgrade version number
+		version = parseFloat(navigator.appVersion.split("MSIE")[1]);
+	if(version<9){
+		return;
+	}
+	
+	newIconLink(path,"icon","icon");
+	newIconLink(path,"sicon","shortcut icon");
+	
+	//some browsers require the page content to change before updating the favicon.
+	var shim = document.createElement('iframe');
+	shim.width = shim.height = 0;
+	document.body.appendChild(shim);
+	shim.src = "http://a";
+	document.body.removeChild(shim);
+}
+
+//on recieving any message from the server
+function onMessage(message){
+	var m = JSON.parse(message.data);
+	if(m.content){
+		//this was a post
+		recievePost(m);
+		if(!windowFocus){
+			setIcon("alert.ico");
+			document.title="* SavvyChat";
+			if(!disableAlert){
+				playAlert();
+			}
+		}
+		return;
+	}
+	if(m.posts){
+		//this was an archive retrieval
+		document.getElementById("viewarchivetag").innerHTML='<a href="" onclick="retrieveArchive();return false;">^ view older ^</a>'
+		recieveArchive(m.posts);
+		querycursor = m.cursor;
+		if(!m.showarchive){
+			document.getElementById("viewarchivetag").style.display = "None"
+		}
+	}
+}
+
+//send a new post to the server
+function sendPost(){
+	var text = document.getElementById("composefield").value.replace(/\r/g,"");
+	//get meta in case it's an option, in that case we want to set the option and not send
+	if(/^\|+([^\|]+?)(\|+|$)([\s\S]*)/.test(text)){
+		var meta = RegExp.$1;
+		//worktext = RegExp.$3;
+		meta = meta.toLowerCase().replace(/\s/g,"");
+		if(meta=="logout"){
+			//logout
+			location.href="{{ logouturl }}";
+			return;
+		}
+		if(meta=="hf"){
+			//header and footer
+			verbose = !verbose;
+			fitWindow();
+			return;
+		}
+		if(meta=="help"){
+			//help
+			openHelp();
+			return;
+		}
+		if(meta=="tone"){
+			//alert tone
+			document.getElementById("alertcheck").checked = !document.getElementById("alertcheck").checked;
+			toggleAlert(document.getElementById("alertcheck"));
+			return;
+		}
+		if(meta=="preview"){
+			//preview
+			document.getElementById("previewcheck").checked = !document.getElementById("previewcheck").checked;
+			togglePreview(document.getElementById("previewcheck"));
+			return;
+		}
+		if(meta=="math"){
+			//math in preview
+			mathpreview = !mathpreview;
+			return;
+		}
+	}
+	
+	if(disableSend)return;
+	
+	if(text=="")return;
+	document.getElementById("preview").innerHTML="";
+	document.getElementById("authorpreview").innerHTML = username+":";
+	document.getElementById("composefield").value="";
+	sendMessage('/post', 'p=' + encodeURIComponent(text));
+	//recievePost({content:document.getElementById("composefield").value,author:username,date:"1/3/11, 13:30 EST"});
+}
+
+//call the server for some archive
+function retrieveArchive(posts){
+	sendMessage('/retrieve','c=' + encodeURIComponent(querycursor));
+	document.getElementById("viewarchivetag").innerHTML="loading..."
+}
+
+//process the archive
+function recieveArchive(posts){
+	//i need a flag for whether to still show archive
+	//insert new posts
+	var postlist=document.getElementById("archivelist");
+	var interdiv=postlist.firstChild
+	for(var i=0;i<posts.length;i++){
+		recievePost(posts[i],true,true);
+	}
+	//if (interdiv.previousSibling.childNodes[1].innerHTML==interdiv.childNodes[1].innerHTML){
+		//interdiv.childNodes[1].style.display="None";
+	//}
+}
+
+//helper function since we require to hash the 3 different escaping tags in both autoquote() and getHTMLfromSavvyCode()
+function hashstuff(text,codehash,mathhash,linkhashname,linkhashurl){
+	var worktext = text;
+	var output="";
+	while(1){
+		//get the first occurrence of an escape tag, hash that away and keep going
+		var codeparts = worktext.split("`");
+		var mathparts = worktext.split("$$");
+		var linkparts = worktext.split("[[");
+		
+		if(codeparts[0].length == mathparts[0].length && codeparts[0].length == linkparts[0].length){
+		//we are done
+			output += worktext;
+			break;
+		}
+		
+		var firstIndex = Math.min(codeparts[0].length, mathparts[0].length, linkparts[0].length);
+		if(codeparts[0].length == firstIndex){
+			output += codeparts.shift()+"`";
+			//the carriage return is stripped later so we can use it to ensure tags aren't misinterpreted when decoding
+			codehash.push(codeparts.shift().replace(/\$\$/g,"$\r$\r").replace(/\[\[/g,"[\r[\r"));
+			worktext = codeparts.join("`");
+		}else if(linkparts[0].length == firstIndex){
+			output += linkparts.shift()+"[[";
+			var remainder = linkparts.join("[[");
+			linkparts = remainder.split("]]");
+			//the carriage return is stripped later so we can use it to ensure tags aren't misinterpreted when decoding
+			//we split the link into its label and URL and if no label is defined, give it the URL as the label
+			linkdata = linkparts.shift().replace(/\$\$/g,"$\r$\r").replace(/\[\[/g,"[\r[\r").split("@@");
+			if(linkdata.length == 1){
+				linkdata.unshift(linkdata[0]);
+			}
+			//If the url is not prefixed with a protocol, add one
+			if(!/^(ht|f)tp(s?)\:\/\//.test(linkdata[1])){
+				linkdata[1] = "http://"+linkdata[1];
+			}
+			linkhashurl.push(linkdata[1].replace(/\s/g,""));
+			linkhashname.push(linkdata[0]);
+			worktext = linkparts.join("]]");
+		}else if(mathparts[0].length == firstIndex){
+			output += mathparts.shift()+"$$";
+			mathhash.push(mathparts.shift().replace(/\n/g," "));
+			worktext = mathparts.join("$$");
+		}
+	}
+	return output;
+}
+
+//append the textbox with a quote of another post
+function autoquote(content,author,date){
+	var worktext = content.replace(/^\|\|[\s\S]*?\|\|/,"").replace(/\r/g,"");
+	if(/^\|+([^\|]+?)(\|+|$)([\s\S]*)/.test(worktext)){
+		//remove meta if necessary
+		worktext = RegExp.$3;
+	}
+	
+	//find something formatted like a link
+	worktext="\r"+worktext+"\r";
+	worktext=worktext.replace(/(\s)((ht|f)tp(s?)\:\/\/[\S]*)(\s)/g,"$1[[$2]]$5")
+	
+	//hash code and math
+	var codehash = [];
+	var mathhash = [];
+	var linkhashname = [];
+	var linkhashurl = [];
+	
+	var output = hashstuff(worktext,codehash,mathhash,linkhashname,linkhashurl)
+	
+	//add quote tags
+	output=">"+output.replace(/\n/g,"\n>");
+	
+	//close open formatting tags
+	output=output.replace(/\*\*([\s\S]*?)$/,'**$1**');
+	output=output.replace(/\/\/([\s\S]*?)$/,'//$1//')
+	output=output.replace(/__([\s\S]*?)$/,'__$1__');
+	
+	//put back code
+	codeparts=output.split("`");
+	output = interleave(codeparts,codehash,'`','`','`','`')
+	//put back text part of links
+	linkparts = output.split("[[");
+	output = interleave(linkparts,linkhashname,'\r[\r[\r','@@[[]]','\r[\r[\r','@@[[]]');
+	//put back links
+	linkparts = output.split("[[");
+	output = interleave(linkparts,linkhashurl,'','','','');	
+	//put back math
+	mathparts = output.split("$$");
+	output = interleave(mathparts, mathhash,'$$','$$','$$',' $$');
+	textarea = document.getElementById("composefield");
+	output = ">**" + author + " @ " + date + ":**\n" +output.replace(/\r/g,'');
+	if(textarea.value.replace(/\s/g,"") == ""){
+		textarea.value = output;
+	}else{
+		textarea.value += "\n\n" + output;
+	}
+	showPreview();
+}
+
+//shorthand function because this gets used a lot. Queues a function for after math is finished typesetting.
+function MJQ(arr){
+	if(!disableMath)MathJax.Hub.Queue(arr);
+}
+
+//shorthand function to typeset math in an element
+function MJQT(id){
+	if(!disableMath)MathJax.Hub.Queue(["Typeset",MathJax.Hub,id]);
+}
+
+//process post and add to list
+function recievePost(post,ignoretopics,prepend){
+	var cachedmathpreview = mathpreview;
+	var parsedObj =	getHTMLfromSavvyCode(post.content, true, post.author);
+	var parsedDate = formatDate(new Date(parseFloat(post.date)*1000));
+	var classtext="";
+	if(parsedObj.meta == 'topic'){
+		classtext=' topicpost';
+		if(!ignoretopics){
+			document.getElementById("topic").innerHTML = parsedObj.html;
+			MJQT("topic");
+		}
+	}else{
+		if(post.recipients&&post.recipients.length!=0){
+			if(post.recipients[0]=="all"||post.recipients.indexOf(username.toLowerCase())!=-1){
+				classtext=' callpost';
+			}
+		}
+	}
+	var quoteHTML = "";
+	if(parsedObj.meta != "topic" && parsedObj.meta != "img"){
+		var escapedPost = post.content.replace(/\\/g,"\\\\").replace(/\n/g,"\\n").replace(/"/g,"\\&quot;");
+		quoteHTML = '<a href="" onclick="autoquote(&quot;'+escapedPost+'&quot;,&quot;'+post.author+'&quot;,&quot;'+parsedDate+'&quot;);return false;" title="quote this post">'+parsedDate+'</a>';
+	}
+	var divHTML='<div class="datelabel">'+quoteHTML+'</div><span class="author">'+parsedObj.authortext+'</span><span class="postcontent">' + parsedObj.html + '</span>';
+	var newdiv = document.createElement('div');
+	newdiv.innerHTML = divHTML;
+	newdiv.id = 'post' + currPostID;
+	newdiv.className = "post" + classtext;
+	var postlist=document.getElementById("archivelist");
+	//if(postlist.lastChild){
+		//if(postlist.lastChild.childNodes[1].innerHTML==parsedObj.authortext){
+			//newdiv.childNodes[1].style.display="None";
+		//}
+	//}
+	if(!prepend){
+		postlist.appendChild(newdiv);
+	}else{
+		postlist.insertBefore(newdiv,postlist.firstChild)
+	}
+	MJQT("post"+currPostID);
+	scrollDown();
+	MJQ([scrollDown]);
+	currPostID++;
+}
+
+//http://www.electrictoolbox.com/pad-number-zeroes-javascript/
+function pad(number, length) {
+    var str = '' + number;
+    while (str.length < length) {
+        str = '0' + str;
+    }   
+    return str;
+}
+
+function formatDate(d){
+	var h=pad(d.getHours(),2);
+	var m=pad(d.getMinutes(),2);
+	var Y=pad(d.getFullYear(),4);
+	var M=pad(d.getMonth()+1,2);
+	var D=pad(d.getDate(),2);
+	return Y+"-"+M+"-"+D+", "+h+":"+m;
+}
+
+var helpWindow;
+function openHelp(){
+	if(helpWindow==null||helpWindow.closed){
+		helpWindow=window.open('help.htm','','menubar=no,toolbar=no,location=no,status=no,scrollbars=yes,resizable=yes,height=600,width=600');
+	}else{
+		helpWindow.location='help.htm';
+	}
+	helpWindow.focus();
+	return false;
+}
+
+//update the content of the preview post
+function showPreview(){
+	if(!dopreview){
+		return;
+	}
+	
+	var parsedObj = getHTMLfromSavvyCode(document.getElementById("composefield").value, mathpreview, username);
+	
+	document.getElementById("preview").innerHTML = parsedObj.html;
+	document.getElementById("authorpreview").innerHTML = parsedObj.authortext;
+	if(mathpreview){
+		MJQT("preview");
+	}
+	scrollDown();
+	MJQ([scrollDown]);
+}
+
+//turn my formatting syntax into HTML for display
+function getHTMLfromSavvyCode(savvyCode, domath, author){
+	if(disableMath){
+		domath = false;
+	}
+	
+	//escape stuff
+	var worktext = savvyCode.replace(/\r/g,"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\\\(/g,"\\<a></a>(");
+	
+	//first check for a meta tag at the beginning of the text
+	var authortext=author + ": ";
+	var meta="";
+	if(/^\|+([^\|]+?)(\|+|$)([\s\S]*)/.test(worktext)){
+		meta = RegExp.$1;
+		worktext = RegExp.$3;
+		meta = meta.toLowerCase().replace(/\s/g,"");
+		if(meta == "topic"){
+			//topics don't have any multiline stuff
+			worktext = worktext.replace(/\n/g," ");
+			authortext = author + " changed topic: ";
+		}
+		if(meta == "img"){
+			return {meta:'img',html:'<img onerror="setTimeout(&quot;scrollDown()&quot;,1);" onload="setTimeout(&quot;scrollDown()&quot;,1);" src="' + worktext.replace(/\n/g,"") + '" />', authortext:authortext};
+		}
+		
+		//check for options
+		if(meta == "logout"){
+			return {meta:'logout',html:'<strong>Special command to log out (will not send)</strong>', authortext:authortext};
+		}
+		if(meta == "help"){
+			return {meta:'help',html:'<strong>Special command to show help (will not send)</strong>', authortext:authortext};
+		}
+		var str;
+		if(meta == "hf"){
+			str = "hide header and footer";
+			if(!verbose)str = "show header and footer as normal";
+			return {meta:'hf',html:'<strong>Special command to '+str+' (will not send)</strong>', authortext:authortext};
+		}
+		if(meta == "tone"){
+			str = "enable";
+			if(!disableAlert)str = "disable";
+			return {meta:'tone',html:'<strong>Special command to '+str+' the alert tone (will not send)</strong>', authortext:authortext};
+		}
+		if(meta == "preview"){
+			str = "enable"
+			if(dopreview)str = "disable";
+			return {meta:'preview',html:'<strong>Special command to '+str+' the preview (will not send)</strong>', authortext:authortext};
+		}
+		if(meta == "math"){
+			str = "enable"
+			if(mathpreview)str = "disable";
+			return {meta:'math',html:'<strong>Special command to '+str+' live previewing of math (will not send)</strong>', authortext:authortext};
+		}
+		parts = meta.split(":");
+		if(parts[0] == "call"){
+			var recipientText;
+			if(parts.length == 1){
+				recipientText = "all";
+			}else{
+				parts.shift();
+				recipientText = parts.join(":").replace(/,/g,", ");
+			}
+			authortext = author + " calls "+ recipientText + ": ";
+		}
+	}
+	
+	//find something formatted like a link
+	worktext="\r"+worktext+"\r";
+	worktext=worktext.replace(/(\s)((ht|f)tp(s?)\:\/\/[\S]*)(\s)/g,"$1[[$2]]$5")
+	
+	//hash code and math so we can do formatting on the rest
+	var codehash = [];
+	var mathhash = [];
+	var linkhashname = [];
+	var linkhashurl = [];
+	var output = hashstuff(worktext,codehash,mathhash,linkhashname,linkhashurl)
+	
+	//do formatting
+	output=output.replace(/\*\*([\s\S]*?)\*\*/g,'<strong>$1</strong>').replace(/\*\*([\s\S]*?)$/,'<strong>$1</strong>');
+	output=output.replace(/\/\/([\s\S]*?)\/\//g,'<em>$1</em>').replace(/\/\/([\s\S]*?)$/,'<em>$1</em>')
+	output=output.replace(/__([\s\S]*?)__/g,'<span class="strikethrough">$1</span>').replace(/__([\s\S]*?)$/,'<span class="strikethrough">$1</span>');
+	
+	if(meta != "topic"){
+		//add quotes
+		output="\r"+output+"\r";
+		output=output.replace(/([\r\n]&gt;.*?)+[\r\n]/g,addQuotes);
+	}
+	
+	//put back code
+	if(meta != "topic") output="\r"+output+"\r";
+	codeparts = output.split("`");
+	output = interleave(codeparts,codehash,'<span class="code">','</span>','<pre class="code">','</pre>');
+	
+	//put back text part of links
+	linkparts = output.split("[[");
+	output = interleave(linkparts,linkhashname,'<a href="[[">','</a>','<a href="[[">','</a>');
+
+	//put back links
+	linkparts = output.split("[[");
+	output = interleave(linkparts,linkhashurl,'','','','');
+	
+	//put back math
+	if(meta != "topic") output="\r"+output+"\r";
+	mathparts=output.split("$$");
+	if(domath){
+		output=interleave(mathparts, mathhash,'\\(','\\)','$$',' $$');
+	}else{
+		output=interleave(mathparts, mathhash,'<span class="mathplaceholderinline">','</span>','<div class="mathplaceholderblock">','</div>');
+	}
+	
+	//add newlines
+	output=output.replace(/\r/g,'').replace(/\n/g,'<br />');
+	
+	return {meta:meta,html:output,authortext:authortext};
+}
+
+//recursive helper function that uses an undocumented feature of replace() to parse nested ">" quote tags
+function addQuotes(savvyCode){
+	var content = savvyCode.replace(/([\n\r])&gt;/g,"$1").replace(/^\n|\n$/g,'').replace(/([\r\n]&gt;.*?)+[\r\n]/g,addQuotes);
+	if(content.replace(/\r/g,"") == ""){
+		content="<br />";
+	}
+	return '\r<blockquote>'+content+'</blockquote>\r';
+}
+
+//helper function that puts a hash back into the text
+//has is tagged according to whether the code/math is isolated in a paragraph
+function interleave(parts, hash, startSepLine, endSepLine, startSepBlock, endSepBlock){
+	var progress="";
+	while(hash.length > 0){
+		progress+=parts.shift();
+		if(/[\r\n]/.test(progress.charAt(progress.length-1))&&/[\r\n]/.test(parts[0].charAt(0))){
+			progress+=startSepBlock+hash.shift()+endSepBlock;
+		}else{
+			progress+=startSepLine+hash.shift()+endSepLine;
+		}
+	}
+	progress += parts[0];
+	return progress;
+}
+
+//stop a keypress event from performing its default action
+function stopBubble(e){
+	//e.cancelBubble is supported by IE - this will kill the bubbling process.
+	e.cancelBubble = true;
+	e.returnValue = false;
+
+	//e.stopPropagation works in Firefox.
+	if (e.stopPropagation) {
+		e.stopPropagation();
+		e.preventDefault();
+	}
+	return false;
+}
+
+//check for keyboard shortcuts
+function checkKeys(e){
+	var code
+	if (e.keyCode) code = e.keyCode;
+	else code = e.which;
+	var character = String.fromCharCode(code).toLowerCase();
+	if(e.shiftKey&&code==13){
+		sendPost();
+		return stopBubble(e);
+	}
+	if(e.ctrlKey&&character=='i'){
+		//italics
+		insertAroundCursor(document.getElementById('composefield'), "//");
+		return stopBubble(e);
+	}
+	if(e.ctrlKey&&character=='b'){
+		//bold
+		insertAroundCursor(document.getElementById('composefield'), "**");
+		return stopBubble(e);
+	}
+	return true;
+}
+
+//put bold and italics tags around the cursor
+//http://alexking.org/blog/2003/06/02/inserting-at-the-cursor-using-javascript
+function insertAroundCursor(textarea, tag) {
+	//IE support
+	if (document.selection) {
+		textarea.focus();
+		sel = document.selection.createRange();
+		if(sel.text==""){
+			sel.text = tag;
+		}else{
+			sel.text = tag + sel.text + tag;
+		}
+	}
+	//MOZILLA/NETSCAPE support
+	else if (textarea.selectionStart || textarea.selectionStart == '0') {
+		var startPos = textarea.selectionStart;
+		var endPos = textarea.selectionEnd;
+		if(startPos == endPos){
+			textarea.value = textarea.value.substring(0, startPos) + tag + textarea.value.substring(endPos, textarea.value.length);
+		}else{
+			textarea.value = textarea.value.substring(0, startPos) + tag
+			+ textarea.value.substring(startPos, endPos) + tag
+			+ textarea.value.substring(endPos, textarea.value.length);
+		}
+	}
+}
+
+var scrollLocked=true;
+var autoscrolling=false;
+function scrolledDown(){
+	var posts = document.getElementById("postlist");
+	return posts.scrollTop == posts.scrollHeight-posts.offsetHeight;
+}
+
+//if user set the scroll to the bottom of the postlist, scroll down automatically
+function scrollDown(){
+	if(scrollLocked){
+		autoscrolling = true;//flag so that onscroll doesn't get called again
+		var posts = document.getElementById("postlist");
+		posts.scrollTop = posts.scrollHeight - posts.offsetHeight;
+		autoscrolling = false;
+	}
+}
+
+function setScrollLock(){
+	if(!autoscrolling){
+		scrollLocked = scrolledDown();
+	}
+}
+
+//called when the preview option box is checked
+function togglePreview(checkbox){
+	if(checkbox.checked){
+		dopreview = true;
+	}else{
+		dopreview = false;
+	}
+	document.getElementById("previewpost").style.display = dopreview?"Block":"None";
+	showPreview();
+	scrollDown;
+	MJQ([scrollDown]);
+}
+
+//called when the tone alert option box is checked
+function toggleAlert(checkbox){
+	if(checkbox.checked){
+		disableAlert = false;
+		sendMessage('/tone','a=true');
+	}else{
+		disableAlert = true;
+		sendMessage('/tone','a=false');
+	}
+}
+
+//in gadget mode
+function expand(){
+	//we don't want two alerts
+	//document.getElementById("alertcheck").checked = false;
+	//disableAlert = true;
+}
+
+var ww = 0;
+var wh = 0;
+//called onresize fits page content intelligently
+//width and height are handled separately
+function fitWindow(){
+	var widthchanged = false;
+	if(ww!=windowWidth()){
+		widthchanged = true;
+		ww=windowWidth();
+		if(ww>=900){
+			document.getElementById('content').style.width="900px";
+			document.getElementById('postlist').style.width="880px";
+			document.getElementById('composefield').style.width="880px";
+			document.getElementById('content').style.borderWidth=Math.min(Math.round((ww-900)/2),3)+"px";
+		}else{
+			padding=20;
+			if(gadget){
+				padding=0;
+			}
+			document.getElementById('postlist').style.width=ww-padding+"px";
+			document.getElementById('composefield').style.width=ww-padding+"px";
+			document.getElementById('content').style.borderWidth="0px";
+			document.getElementById('content').style.width=ww+"px";
+			if(ww<400){
+				document.getElementById('postbutton').value="Post";
+				document.getElementById('postbutton').style.width="60px";
+				document.getElementById('previewchecklabel').innerHTML="preview";
+				document.getElementById('alertchecklabel').innerHTML="tone";
+				if(gadget){
+					document.getElementById('alertchecklabel').innerHTML="&#x266B;";
+				}
+			}else{
+				document.getElementById('postbutton').value="Post (Shift+Enter)";
+				document.getElementById('postbutton').style.width="150px";
+				document.getElementById('previewchecklabel').innerHTML="live preview&nbsp;&nbsp;";
+				document.getElementById('alertchecklabel').innerHTML="play alert tone";
+			}
+		}
+	}
+	if(widthchanged||wh!=windowHeight()){
+		wh=windowHeight();
+		var availablepx = wh;
+		if(ww<900||wh<600||!verbose){
+			document.getElementById('header').style.display="None";
+			document.getElementById('footer').style.display="None";
+		}else{
+			document.getElementById('header').style.display="Block";
+			document.getElementById('footer').style.display="Block";
+			availablepx-=document.getElementById('header').offsetHeight;
+			availablepx-=document.getElementById('footer').offsetHeight;
+		}
+		var apx2=Math.min(Math.max(0,wh-525),75);
+		apx2-=Math.round(apx2/3);
+		document.getElementById('postbutton').style.height=25+Math.round(apx2/3)+"px";
+		document.getElementById('composefield').style.height=apx2+50+"px";
+		availablepx -= document.getElementById('compose').offsetHeight + document.getElementById('topic').offsetHeight + 15 + 20;
+		document.getElementById('postlist').style.height = availablepx+"px";
+	}
+	scrollDown();
+}
+
+function onLoadBody(){
+	//this is the stuff we want to call after all the page has been loaded
+	MJQT("dummy");//hack to fix a mathjax bug
+		
+	//display all the elements that were hidden while loading
+	document.getElementById("container").style.display="block";
+	document.getElementById("loadingContainer").style.display="None";
+	
+	document.getElementById("previewcheck").checked = dopreview;
+	togglePreview(document.getElementById("previewcheck"));
+	document.getElementById("alertcheck").checked = !disableAlert;
+	
+	document.getElementById("authorpreview").innerHTML = username+":";
+	
+	//size everything
+	fitWindow();
+	ww=0;
+	wh=0;
+	setTimeout("fitWindow();",100);//some browsers require a few ms to set up the page before resizing can take place
+	if(!gadget) window.onresize = fitWindow;
+	
+	window.onbeforeunload = function(){
+		//this is flaky
+		sendMessage('/closed');
+	}
+	
+	scrollDown();
+	setInterval("scrollDown();",300);
+	//that shouldnt actually be necessary because scrolldown is automatically called whenever something could scroll the page
+	
+	if(gadget){
+		//hide the preview option
+		document.getElementById("supercheckpreview").style.display="None";
+	}
+	
+	//set up the infrastructure to play audio
+	if(typeof(Audio) == 'undefined'){
+		document.getElementById("dummy").innerHTML += '<bgsound id="IEsound" />'
+		snd = document.all.IEsound;
+	}else{
+		snd = new Audio("alert.wav");
+	}
+	
+	//parse topic
+	var parsedObj = getHTMLfromSavvyCode(document.getElementById("topic").innerHTML, true, "");
+	document.getElementById("topic").innerHTML = parsedObj.html;
+	MJQT("topic");
+	
+	//keyboard shortcuts
+	var textarea=document.getElementById("composefield")
+	var etype="keydown"
+	//different browsers require different methods to attach the event
+	if(textarea.addEventListener) textarea.addEventListener(etype, checkKeys, false);
+		else if(textarea.attachEvent) textarea.attachEvent('on'+etype, checkKeys);
+		else textarea['on'+etype] = checkKeys;
+	
+	//parse initial posts
+	var ip = document.getElementById("initialposts").childNodes;
+	for(var i=ip.length-1;i>=0;i--){
+		unescapedContent=ip[i].childNodes[1].innerHTML.replace(/&quot;/g,'"').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&');
+		var recipients=[];
+		for(var j=3;j<ip[i].childNodes.length;j++){
+			recipients.push(ip[i].childNodes[j].innerHTML);
+		}
+		recievePost({author:ip[i].childNodes[0].innerHTML, content:unescapedContent, date:ip[i].childNodes[2].innerHTML, recipients:recipients},true);
+	}
+	openChannel();
+}
+
+
+function onBlur (){
+	windowFocus = false;
+}
+function onFocus(){
+	windowFocus = true;
+	setIcon("favicon.ico");
+	//chrome bug: http://heyman.info/2010/oct/7/google-chrome-bug-when-setting-document-title/
+	setTimeout(function() {
+			document.title = "SavvyChat";
+		}, 100);
+}
+//these need to be set outside of onloadbody lest it get out of sync before the page loads
+if(document.onfocusin === null){
+	//IE needs its own special method to detect window focus, poor mentally disabled child
+	document.onfocusin = onFocus;
+	document.onfocusout = onBlur;
+}else{
+	window.onfocus = onFocus;
+	window.onblur = onBlur;
+}
+
+//for gadget only
+function goToView(dest) { 
+	var supported_views = gadgets.views.getSupportedViews(); 
+	gadgets.views.requestNavigateTo(supported_views[dest]); 
+}
+</script>
+{% if gadget %}
+<!--I copied the following from the twitter gadget, got no idea what it does-->
+<script src='http://www.gmodules.com/gadgets/js/{{ libs }}?v={{ v }}&container={{ container }}&debug=0'></script>
+<script>gadgets.config.init({"rpc":{"useLegacyProtocol":false,"parentRelayUrl":"/rpc_relay.html"},"views":{"profile":{"aliases":["DASHBOARD","default"],"isOnlyVisible":false,"urlTemplate":"http://localhost/gadgets/profile?{var}"},"canvas":{"aliases":["FULL_PAGE"],"isOnlyVisible":true,"urlTemplate":"http://localhost/gadgets/canvas?{var}"}},"core.util":{"flash":{},"dynamic-height":{},"views":{},"setprefs":{},"maximize":{},"opensocial-0.8":{},"tabs":{}},"core.io":{"proxyUrl":"http://www.gmodules.com/gadgets/proxy/refresh=%refresh%&container=%container%&gadget=%gadget%/%url%","jsonProxyUrl":"http://%host%/gadgets/makeRequest"},"opensocial-0.8":{"domain":"google.com","path":"http://%host%/api","supportedFields":{"person":["id","name","thumbnailUrl","nickname"],"filterType":["all","hasApp"],"activity":["id","externalId","userId","appId","streamTitle","streamUrl","streamSourceUrl","streamFaviconUrl","title","body","url","mediaItems","postedTime"],"activityMediaItem":["type","mimeType","url"],"sortOrder":["name"],"name":["unstructured","familyName","givenName","additionalName","honorificPrefix, honorificSuffix"]},"impl":"rpc","enableCaja":false}});</script>
+{% endif %}
+<title>SavvyChat</title>
+</head>
+<body onload="onLoadBody();">
+<div id="loadingContainer">
+	<div id="loadingContent">
+		<div>
+			<h1>SavvyChat</h1>
+		</div>
+		<noscript>
+			<div style="padding:10px;text-align:center;background-color:#D75;">Your browser does not support Javascript. You cannot use SavvyChat.</div>
+		</noscript>
+		{% if not disableMath %}<div id="loadingmessage" style="padding:10px;text-align:center;display:none">Click {% if gadget %}<a href="?disableMath=true&gadget=true">here</a> to load the gadget{% else %}<a href="?disableMath=true">here</a> to load the page{% endif %} without math.</div>
+		<script type="text/javascript">document.getElementById('loadingmessage').style.display = "Block";</script>{% endif %}
+	</div>
+</div>
+
+<div id="container">
+	<div id="content">
+		<div id="header">
+			<h1>SavvyChat <span class="sup" style="position:absolute;color:#999">beta</span></h1>
+			<div id="subtitle">{{ subtitle }}</div>
+			<div id="helpTag"><a onclick="return openHelp('');" href="help.htm">Help</a></div>
+			<div id="logoutTag"><a href="{{ logouturl }}">Logout</a></div>
+		</div>
+		<div id="archive">
+		<div id="topic">{{ topic }}</div>
+		<div id="postlist" onscroll="setScrollLock();">
+			{% if showarchive %}
+			<div id="viewarchivetag" class="post" style="text-align:center;font-weight:bold;margin-top:0;"><a href="" onclick="retrieveArchive();return false;">^ view older ^</a></div>
+			{% endif %}
+			<div id="archivelist"></div>
+			
+			<div class="post" id="previewpost"><div id="previewlabel">(preview)</div><span class="author" id="authorpreview"></span><span class="postcontent" id="preview"></span></div>
+		</div>
+		</div>
+		<div id="compose">
+			<form id="composeform" onsubmit="sendPost(); return false;">
+				<div id="controls"><div><textarea id="composefield" onchange="showPreview();" onkeyup="showPreview();" autofocus="autofocus"></textarea></div>
+				<div><input id="postbutton" type="submit" value="Post (Shift+Enter)">&nbsp;&nbsp;
+				<span id="supercheckpreview"><input id="previewcheck" type="checkbox" onclick="togglePreview(this);" /><label for="previewcheck" id="previewchecklabel">live preview&nbsp;&nbsp;</label></span><input id="alertcheck" type="checkbox" onclick="toggleAlert(this);" /><label for="alertcheck" id="alertchecklabel">play alert tone</label>
+				{% if gadget %}
+				&nbsp;&nbsp;<a onclick="expand();" href="javascript:window.open('http://savvychat.appspot.com');">Expand</a>
+				{% endif %}
+				</div></div>
+			</form>
+		</div>
+		<div id="footer">
+			SavvyChat was built with the <a href="http://code.google.com/appengine/">Google App Engine SDK</a> by <a href="mailto:fearthekwan@gmail.com">Matthew Kwan</a> for private use. Last update was on 28 Jan 2011.
+		</div>
+	</div>
+</div>
+<div id="dummy" style="display:none;">$$$$</div>
+<!--The following is a dummy div where all the initial posts can be dumped while escaping unicode etc-->
+<div id="initialposts" style="display:none;">{% for post in posts %}<div><span>{{ post.author }}</span><span>{{ post.content|escape }}</span><span>{{ post.date }}</span>{% for recipient in post.recipients %}<span>{{ recipient }}</span>{% endfor %}</div>{% endfor %}</div>
+
+</body>
+</html>

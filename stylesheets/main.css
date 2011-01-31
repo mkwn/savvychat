@@ -1,0 +1,30 @@
+body{
+font-family: Tahoma, Geneva, sans-serif;
+font-size:10pt;
+}
+
+a{
+text-decoration: none;
+}
+
+.code{
+font-family: Courier New, monospace;
+background-color: #EEE;
+}
+
+em{
+font-style: italic;
+}
+strong{
+font-weight:bold;
+}
+span.strikethrough{
+text-decoration:line-through;
+}
+.sup{
+font-size: 50%;
+vertical-align: super;
+}
+.small{
+font-size: 70%;
+}

@@ -1,0 +1,39 @@
+application: savvychat
+version: 1
+runtime: python
+api_version: 1
+
+handlers:
+- url: /stylesheets
+  static_dir: stylesheets
+
+- url: /favicon.ico
+  static_files: favicon.ico
+  upload: favicon.ico
+
+- url: /alert.ico
+  static_files: alert.ico
+  upload: alert.ico
+
+- url: /json2.js
+  static_files: json2.js
+  upload: json2.js
+  
+- url: /alert.wav
+  static_files: alert.wav
+  upload: alert.wav
+  
+- url: /help.htm
+  static_files: help.htm
+  upload: help.htm
+  
+- url: /gadget.xml
+  static_files: gadget.xml
+  upload: gadget.xml
+  
+- url: /todo.txt
+  static_files: todo.txt
+  upload: todo.txt
+
+- url: /.*
+  script: savvychat.py

@@ -1,0 +1,67 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<link type="text/css" rel="stylesheet" href="/stylesheets/main.css" />
+<style type="text/css">
+.spaced li{
+margin-bottom:10px;
+}
+</style>
+<script type="text/javascript" src="http://mathjax.org/mathjax/MathJax.js">
+MathJax.Hub.Config({
+        extensions: ["tex2jax.js","TeX/AMSmath.js", "TeX/AMSsymbols.js", "TeX/autobold.js","TeX/noUndefined.js"],
+		messageStyle: "none",
+        jax: ["input/TeX", "output/HTML-CSS"],
+        tex2jax: {
+            inlineMath: [ ["\\(","\\)"] ],
+            displayMath: [ ['$$','$$'] ]
+        },
+        "HTML-CSS": { availableFonts: ["TeX"] }
+    });
+</script>
+
+<title>SavvyChat - Help</title>
+</head>
+<body>
+<h1>Help</h1>
+<p>SavvyChat is designed to combine the functions of email, IRC and IM. New messages will automatically be delivered to everyone, but the chat is persistent over multiple sessions like email. SavvyChat is equally suitable for sending an essay or the word &quot;lol&quot;.</p>
+<p>You can include SavvyChat into GMail or iGoogle by adding the gadget <span class="code">http://savvychat.appspot.com/gadget.xml</span>. You may first need to enable adding gadgets by URL in GMail Labs. Note that this is a rough work in progress and does not currently work in any version of Internet Explorer.</p>
+<p>Authentication is done with your Google account. There is a whitelist of accounts that I'm allowing to view and use SavvyChat.</p>
+<p>Basic usage should be self-explanatory. There are a number of special codes that can be used for formatting and such, and most are designed to look as natural as possible even before being parsed.
+<ul class="spaced">
+<li><span class="code">I am **very** angry</span> renders as &quot;I am <strong>very</strong> angry&quot;</li>
+<li><span class="code">Nice //ad hominem//, bro</span> renders as &quot;Nice <em>ad hominem</em>, bro&quot;</li>
+<li><span class="code">I __love__ hate you</span> renders as &quot;I <span class="strikethrough">love</span> hate you&quot;</li>
+<li>Text within <span class="code">`</span> tags (backtick, underneath your esc key) does not have formatting applied and is displayed as-is in a fixed-width font (for displaying computer code or an ASCII diagram).<br />Example: <span class="code">`def exp(x,y): return x**y`</span> renders as &quot;<span class="code">def exp(x,y): return x**y</span>&quot;</li>
+<li>You can also typeset math in TeX: <span class="code">$<a></a>$e=mc^2$<a></a>$</span> renders as &quot;\(e=mc^2\)&quot;. Math can take some time to render on slower computers.</li>
+<li>You can quote someone by starting a line with <span class="code">&gt;</span> (click the quote button next to someone's post for an example)</li>
+<li>Although most objects that look like a link are automatically turned into one, you can specify a link by enclosing the URL in <span class="code">[[dounle square brackets]]</span>. You can give it a label like this: <span class="code">[[label@@url.com]]</span></li>
+</ul>
+
+</p>
+<p>There are also a few tags that classify your message as something special. Put these tags at the beginning of a message. Capitalization doesn't matter.
+<p><span class="code">|call|</span> marks your message as important, and sends an email notification. You can also pass a comma-separated list of names like <span class="code">|call:victor,actuaries|</span> to call only some specific people. The allowed names are:
+<ul>
+<li>Example/Ex</li>
+<li>All/Everyone (default)</li>
+</ul>
+</p>
+
+<p>You can also set the topic with <span class="code">|topic|</span>, and post images with <span class="code">|img|</span> (the body of your message should be an image URL). I hope to allow uploading images and other files in the future.</p>
+
+<p>Finally, you can also use tags to set options. For these, it's sufficient to type just the opening pipe like <span class="code">|preview</span>. The allowed commands are:
+<ul>
+<li><span class="code">|preview</span>: show or hide the blue preview bar</li>
+<li><span class="code">|hf</span>: show or hide the header and footer</li>
+<li><span class="code">|tone</span>: enable or disable the alert tone</li>
+<li><span class="code">|help</span>: show this help window</li>
+<li><span class="code">|math</span>: enable or disable live math preview. This does <em>not</em> disable math altogether, its purpose is to ease CPU load on slower computers.</li>
+</ul>
+</p>
+
+
+
+<p>In the very likely case that you find a bug or something fails catastrophically, please gather as much information as you can (a screen capture, a debug message, some source code etc) and describe the problem to me so I can fix it. I'd also appreciate feature requests. You can see what I've got already <a href="todo.txt">here</a></p>
+</body>
+</html>
