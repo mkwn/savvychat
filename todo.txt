@@ -12,6 +12,7 @@ logoff should close token
 |flushtokens
 time out all requests and verify that sent posts are recieved
 periodically send a refresher so resolvestragglers is more accurate than 2 hours
+|tag| is annoying to type
 
 DISTANT
 highlight calls since last login?
