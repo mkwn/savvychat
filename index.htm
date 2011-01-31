@@ -686,13 +686,14 @@ function recievePost(post,ignoretopics,prepend){
 	newdiv.id = 'post' + currPostID;
 	newdiv.className = "post" + classtext;
 	var postlist=document.getElementById("archivelist");
-	
 	if(!prepend){
 		//append
 		//hide author label for repeated posts by the same author
 		if(postlist.lastChild){
-			if(postlist.lastChild.childNodes[1].innerHTML == parsedObj.authortext){
-				newdiv.childNodes[1].style.display = "None";
+			if(parsedObj.html != ""){
+				if(postlist.lastChild.childNodes[1].innerHTML == parsedObj.authortext){
+					newdiv.childNodes[1].style.display = "None";
+				}
 			}
 		}
 		postlist.appendChild(newdiv);
@@ -700,8 +701,10 @@ function recievePost(post,ignoretopics,prepend){
 		//prepend
 		//hide author label for repeated posts by the same author
 		if(postlist.firstChild){
-			if(postlist.firstChild.childNodes[1].innerHTML == parsedObj.authortext){
-				postlist.firstChild.childNodes[1].style.display = "None";
+			if(parsedObj.html != ""){
+				if(postlist.firstChild.childNodes[1].innerHTML == parsedObj.authortext){
+					postlist.firstChild.childNodes[1].style.display = "None";
+				}
 			}
 		}
 		postlist.insertBefore(newdiv,postlist.firstChild)
@@ -770,7 +773,7 @@ function getHTMLfromSavvyCode(savvyCode, domath, author){
 	//first check for a meta tag at the beginning of the text
 	var authortext=author + ": ";
 	var meta = "";
-	var metahead = ""
+	var metahead = "";
 	var multiline = true;
 	if(/^\|+([^\|]+?)(\|+|$)([\s\S]*)/.test(worktext)){
 		meta = RegExp.$1;
@@ -840,7 +843,7 @@ function getHTMLfromSavvyCode(savvyCode, domath, author){
 			break;
 		}
 	}
-	
+	if(worktext == "") worktext = " ";
 	//find something formatted like a link
 	worktext="\r"+worktext+"\r";
 	worktext=worktext.replace(/(\s)((ht|f)tp(s?)\:\/\/[\S]*)(\s)/g,"$1[[$2]]$5")
@@ -880,15 +883,16 @@ function getHTMLfromSavvyCode(savvyCode, domath, author){
 	if(multiline) output="\r"+output+"\r";
 	mathparts=output.split("$$");
 	if(domath){
-		output=interleave(mathparts, mathhash,'\\(','\\)','$$',' $$');
+		output = interleave(mathparts, mathhash,'\\(','\\)','$$',' $$');
 	}else{
-		output=interleave(mathparts, mathhash,'<span class="mathplaceholderinline">','</span>','<div class="mathplaceholderblock">','</div>');
+		output = interleave(mathparts, mathhash,'<span class="mathplaceholderinline">','</span>','<div class="mathplaceholderblock">','</div>');
 	}
 	
 	//add newlines
 	output=output.replace(/\r/g,'').replace(/\n/g,'<br />');
 	if(metahead == "me"){
-		return {meta:meta,html:"",authortext:username + " " + output};
+		if(output.substr(0,1) != " ") output = " " + output;
+		return {meta:meta,html:"",authortext:author + output};
 	}
 	return {meta:meta,html:output,authortext:authortext};
 }
