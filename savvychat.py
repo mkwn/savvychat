@@ -22,7 +22,7 @@ import re
 import traceback
 
 MAXPOSTS = 30 #max number of posts initialized
-EXTRAPOSTS = 10 #number of posts recieved when "view older" is checked. CANNOT BE ZERO
+EXTRAPOSTS = 10 #number of posts recieved when "view older" is checked.
 
 #http://stackoverflow.com/questions/2350454/simplest-way-to-store-a-value-in-google-app-engine-python
 class Global(db.Model):
@@ -63,7 +63,7 @@ def fetchTokens():
 	#tokens = memcache.get("tokens")
 	#if not tokens:
 	
-	tokens=[]	
+	tokens = []	
 	chatusers = db.GqlQuery("SELECT * FROM Chatuser WHERE tokens!=NULL")
 	for chatuser in chatusers:
 		tokens = tokens + chatuser.tokens
@@ -80,19 +80,19 @@ def call(recipients=[], author="a user", content=""):
 	if recipients == []:
 		return
 	#send out emails
-	TOarray=[]
+	TOarray = []
 	if recipients == ["all"]:
 		#call all
 		chatusers = db.GqlQuery("SELECT * FROM Chatuser")
 		for chatuser in chatusers:
-			TOarray = TOarray + [chatuser.name + ' <' + chatuser.email+'>']
+			TOarray = TOarray + [chatuser.name + ' <' + chatuser.email + '>']
 		pass
 	else:
 		for recipient in recipients:
 			chatuser = getUserFromName(recipient.title())
 			#this isnt working, maybe uppercaseness
 			if chatuser:
-				TOarray = TOarray + [chatuser.name + ' <' + chatuser.email+'>']
+				TOarray = TOarray + [chatuser.name + ' <' + chatuser.email + '>']
 	if TOarray == []:
 		return
 	mail.send_mail(sender='SavvyChat Mailer <mailer@savvychat.appspotmail.com>',
@@ -115,7 +115,7 @@ def resolveStragglers():
 				#expired
 				del chatuser.lastrefreshlist[idx]
 				del chatuser.tokens[idx]
-				expired=True
+				expired = True
 		if expired:
 			chatuser.put()
 		
@@ -162,36 +162,40 @@ class PostPage(webapp.RequestHandler):
 		calltext = post.content
 		
 		#check for meta
+		metahead = ""
 		m = re.match(r"\|+([^\|]+?)(\|+|$)([\s\S]*)", post.content)
 		if m:
 			#we have meta
 			meta,calltext = m.group(1,3)
 			meta = removeWhitespace(meta.lower())
-			
+			metaparts = meta.split(":")
+			metahead = metaparts[0]
 			#check if topic was changed
-			if meta == "topic":
+			if metahead == "topic":
 				Global.set('topic',post.content.replace("\n"," "))
 				
 			#check if users were called
-			colonIndex = meta.find(":")
-			if meta=="call":
-				#no arguments, call all
-				post.recipients=["all"]
-			elif meta[:colonIndex] == "call":
-				callstring = ','+meta[colonIndex+1:].lower()+','
-				#replace aliases
-				aliasData = open("aliases.txt")
-				aliasList = aliasData.readlines()
-				aliasData.close()
-				for aliasRow in aliasList:
+			if metahead == "call":
+				if len(metaparts) == 1:
+					#no arguments, call all
+					post.recipients = ["all"]
+				else:
+					callstring = ',' + ":".join(metaparts[1:]).lower() + ','
 					#replace aliases
-					alias, result = tuple(aliasRow.rstrip().split(" "))
-					callstring = callstring.replace(","+alias+",",","+result+",")
-				post.recipients = list(Set(callstring.split(",")[1:-1]))
-				if "all" in post.recipients:
-					post.recipients=["all"]
-
+					aliasData = open("aliases.txt")
+					aliasList = aliasData.readlines()
+					aliasData.close()
+					for aliasRow in aliasList:
+						#replace aliases
+						alias, result = tuple(aliasRow.rstrip().split(" "))
+						callstring = callstring.replace(","+alias+",",","+result+",")
+					post.recipients = list(Set(callstring.split(",")[1:-1]))
+					if "all" in post.recipients:
+						post.recipients = ["all"]
+		#if metahead != "notify":
 		post.put()
+		#else:
+		#post.date = datetime.now()
 		broadcast(post)
 		authoruser = getUserFromId(post.author)
 		authoruser.put()
@@ -214,7 +218,8 @@ class RetrievePage(webapp.RequestHandler):
 			querycursor = postsData.cursor() #but it's inefficient to keep overwriting the cursor...
 		#postList = postsData.fetch(EXTRAPOSTS)
 		message = simplejson.dumps({'posts':posts,'cursor':querycursor,'showarchive':showarchive})
-		channel.send_message(self.request.get('t'), message)
+		self.response.out.write(message)
+		#channel.send_message(self.request.get('t'), message)
 		
 class TokenPage(webapp.RequestHandler):
 	def post(self):
@@ -284,7 +289,7 @@ class MainPage(webapp.RequestHandler):
 			whitelistData = open("whitelist.txt")
 			whitelist = whitelistData.readlines()
 			whitelistData.close()
-			for emailData in whitelist+[""]:
+			for emailData in whitelist + [""]:
 				if emailData.rstrip() == "":
 					#not in whitelist
 					self.response.out.write(template.render('deny.htm', {'logouturl':logouturl}))
@@ -293,9 +298,9 @@ class MainPage(webapp.RequestHandler):
 				if email == user.email().lower():
 					#user is in whitelist
 					chatuser = Chatuser()
-					chatuser.userid=userid
-					chatuser.name=name
-					chatuser.email=email
+					chatuser.userid = userid
+					chatuser.name = name
+					chatuser.email = email
 					chatuser.put()
 					chatuser.lastonline = datetime(2000,1,1) #so we load every message for them
 					break
@@ -307,7 +312,7 @@ class MainPage(webapp.RequestHandler):
 		#countdown = -1
 		showarchive = False
 		querycursor = ""
-		#the cursor saves the position in the query. However for some reason the cursor needs to be created on the post /before/ the cursor position.
+		#the cursor saves the position in the query.
 		for post in postsData:
 			showarchive = True
 			if len(posts) == MAXPOSTS:
@@ -320,7 +325,7 @@ class MainPage(webapp.RequestHandler):
 					pass
 				else:
 					break
-			posts = posts+[makePostObject(post)]
+			posts = posts + [makePostObject(post)]
 			querycursor = postsData.cursor() #but it's inefficient to keep overwriting the cursor...
 			showarchive = False
 				
@@ -344,9 +349,9 @@ class MainPage(webapp.RequestHandler):
 		#get topic
 		topic = Global.get('topic')
 		
-		disableMath=False
+		disableMath = False
 		if self.request.get('disableMath'):
-			disableMath=True
+			disableMath = True
 		
 		gadget = False
 		v = ""

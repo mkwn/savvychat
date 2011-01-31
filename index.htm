@@ -27,6 +27,7 @@ margin-left:20px;
 margin-right:20px;
 margin-bottom:0;
 }
+
 #preview .code{
 background-color: #BBF;
 }
@@ -37,6 +38,9 @@ background-color: #FB9;
 background-color: #BF9;
 }
 #topic .code{
+background-color: #DDD;
+}
+.notifypost .code{
 background-color: #DDD;
 }
 div.mathplaceholderblock{
@@ -61,6 +65,9 @@ border-color: #BBF;
 }
 .callpost blockquote{
 border-color: #FB9;
+}
+.notifypost blockquote{
+border-color: #DDD;
 }
 
 #loadingContainer{
@@ -211,6 +218,9 @@ background-color:#FDC;
 }
 .topicpost{
 background-color:#EFD;
+}
+.notifypost{
+background-color:#EEE;
 }
 #previewpost{
 background-color:#DDF;
@@ -396,7 +406,9 @@ function onClose(){
 	//sendMessage('/closed');
 	document.getElementById('postbutton').disabled = true;
 	disableSend = true;
-	alert("SavvyChat session expired or broke.");
+	var post = {content:"|notify|Session expired or failed. Savvychat will attempt to aquire a new connection, but possibly you may need to refresh the page.", author:"SavvyChat", date:"", recipients:[]};
+	recievePost(post);
+	//alert("SavvyChat session expired or broke.");
 }
 
 var snd;
@@ -482,7 +494,7 @@ function onMessage(message){
 		}
 		return;
 	}
-	if(m.posts){
+	/*if(m.posts){
 		//this was an archive retrieval
 		document.getElementById("viewarchivetag").innerHTML='<a href="" onclick="retrieveArchive();return false;">^ view older ^</a>'
 		recieveArchive(m.posts);
@@ -490,7 +502,7 @@ function onMessage(message){
 		if(!m.showarchive){
 			document.getElementById("viewarchivetag").style.display = "None"
 		}
-	}
+	}*/
 }
 
 //send a new post to the server
@@ -556,8 +568,21 @@ function sendPost(){
 
 //call the server for some archive
 function retrieveArchive(posts){
-	sendMessage('/retrieve','c=' + encodeURIComponent(querycursor));
+	var xhr = sendMessage('/retrieve','c=' + encodeURIComponent(querycursor));
 	document.getElementById("viewarchivetag").innerHTML="loading..."
+	//using AJAX for the reply seems marginally more reliable than COMET, but I'm not certain. Original COMET code is commented out in onMessage.
+	xhr.onreadystatechange = function(){
+		if(xhr.readyState == 4){
+			xhr.onreadystatechange = function(){};
+			var m = JSON.parse(xhr.responseText);
+			document.getElementById("viewarchivetag").innerHTML='<a href="" onclick="retrieveArchive();return false;">^ view older ^</a>'
+			recieveArchive(m.posts);
+			querycursor = m.cursor;
+			if(!m.showarchive){
+				document.getElementById("viewarchivetag").style.display = "None"
+			}
+		}
+	};
 }
 
 //process the archive
@@ -686,14 +711,26 @@ function MJQT(id){
 function recievePost(post,ignoretopics,prepend){
 	var cachedmathpreview = mathpreview;
 	var parsedObj =	getHTMLfromSavvyCode(post.content, true, post.author);
-	var parsedDate = formatDate(new Date(parseFloat(post.date)*1000));
-	var classtext="";
-	if(parsedObj.meta == 'topic'){
-		classtext=' topicpost';
+	var postdate;
+	if(post.date == ""){
+		postdate = new Date();
+	}else{
+		postdate = new Date(parseFloat(post.date)*1000);
+	}
+	var parsedDate = formatDate(postdate);
+	var classtext = "";
+	var metahead = parsedObj.meta.split(":")[0];
+	if(metahead == 'topic'){
+		classtext = ' topicpost';
 		if(!ignoretopics){
 			document.getElementById("topic").innerHTML = parsedObj.html;
 			MJQT("topic");
 		}
+	}else if(metahead == "notify"){
+		//undocumented meta to send a notification
+		scrollLocked = true;
+		scrollDown();
+		classtext = ' notifypost';
 	}else{
 		if(gotCalled(post)){
 			classtext=' callpost';
@@ -831,6 +868,10 @@ function getHTMLfromSavvyCode(savvyCode, domath, author){
 		case "me":
 			multiline = false;
 			worktext = worktext.replace(/\n/g," ");
+			break;
+		case "notify":
+			//
+			break;
 		case "call":
 			var recipientText;
 			if(parts.length == 1){

@@ -10,9 +10,13 @@ autosend messages that happen between page load and onopen (use cursor)
 call should have a special tone
 logoff should close token
 |flushtokens
+|sync for when messages fail
 time out all requests and verify that sent posts are recieved
 periodically send a refresher so resolvestragglers is more accurate than 2 hours
 |tag| is annoying to type
+autoquoting an action fails
+notification posts shouldn't save
+don't merge messages that have a really long gap
 
 DISTANT
 highlight calls since last login?
@@ -47,6 +51,7 @@ auto link recognition doesn't work with newlines
 
 OPTIMIZATIONS
 probably dont need to send ?u
+maybe ?t should be optional
 math shouldnt need to rerender
 use keys for chatusers instead of filtering and get()ing
 there is a dedicated emailproperty
