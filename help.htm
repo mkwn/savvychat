@@ -26,7 +26,7 @@ MathJax.Hub.Config({
 <body>
 <h1>Help</h1>
 <p>SavvyChat is designed to combine the functions of email, IRC and IM. New messages will automatically be delivered to everyone, but the chat is persistent over multiple sessions like email. SavvyChat is equally suitable for sending an essay or the word &quot;lol&quot;.</p>
-<p>You can include SavvyChat into GMail or iGoogle by adding the gadget <span class="code">http://savvychat.appspot.com/gadget.xml</span>. You may first need to enable adding gadgets by URL in GMail Labs. Note that this is a rough work in progress and does not currently work in any version of Internet Explorer.</p>
+<p>You can include SavvyChat into GMail or iGoogle by adding the gadget <span class="code">http://savvychat.appspot.com/gadget.xml</span>. You may first need to enable adding gadgets by URL in GMail Labs. Note that this is a rough work in progress and does not work in a variety of circumstances.</p>
 <p>Authentication is done with your Google account. There is a whitelist of accounts that I'm allowing to view and use SavvyChat.</p>
 <p>Basic usage should be self-explanatory. There are a number of special codes that can be used for formatting and such, and most are designed to look as natural as possible even before being parsed.
 <ul class="spaced">
@@ -48,7 +48,7 @@ MathJax.Hub.Config({
 </ul>
 </p>
 
-<p>You can also set the topic with <span class="code">|topic|</span>, and post images with <span class="code">|img|</span> (the body of your message should be an image URL). I hope to allow uploading images and other files in the future.</p>
+<p>You can also set the topic with <span class="code">|topic|</span>, perform an action with <span class="code">|me|chuckles in amusement</span>, and post images with <span class="code">|img|</span> (the body of your message should be an image URL). I hope to allow uploading images and other files in the future.</p>
 
 <p>Finally, you can also use tags to set options. For these, it's sufficient to type just the opening pipe like <span class="code">|preview</span>. The allowed commands are:
 <ul>
@@ -57,10 +57,9 @@ MathJax.Hub.Config({
 <li><span class="code">|tone</span>: enable or disable the alert tone</li>
 <li><span class="code">|help</span>: show this help window</li>
 <li><span class="code">|math</span>: enable or disable live math preview. This does <em>not</em> disable math altogether, its purpose is to ease CPU load on slower computers.</li>
+<li><span class="code">|mute</span>: mute or unmute all sounds, including the tone when called.</li>
 </ul>
 </p>
-
-
 
 <p>In the very likely case that you find a bug or something fails catastrophically, please gather as much information as you can (a screen capture, a debug message, some source code etc) and describe the problem to me so I can fix it. I'd also appreciate feature requests. You can see what I've got already <a href="todo.txt">here</a></p>
 </body>

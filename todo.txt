@@ -7,14 +7,14 @@ resend token on expiry
 	in the meantime, give a warning and don't clear the field
 secure to prevent impersonation etc.
 autosend messages that happen between page load and onopen (use cursor)
-ping on call
+call should have a special tone
 logoff should close token
-merge posts with same author
 |flushtokens
-dont send read messages
-more margin around datelabel/previewlabel
+time out all requests and verify that sent posts are recieved
+periodically send a refresher so resolvestragglers is more accurate than 2 hours
 
 DISTANT
+highlight calls since last login?
 dickson wants to be able to mess with the size of the post button and compose field
 15 minute edit window
 gmail gadget

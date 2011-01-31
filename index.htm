@@ -289,6 +289,7 @@ var currPostID = 0;
 var querycursor = '{{ querycursor }}';
 var disableSend = false
 var windowFocus = true;
+var mute = false;
 var socket;
 }
 
@@ -375,7 +376,7 @@ function onClose(){
 }
 
 var snd;
-function playAlert(){
+function playAlert(special){
 	//play sound
 	if(typeof(Audio) == 'undefined'){
 		//this only works in IE
@@ -424,6 +425,15 @@ function setIcon(path){
 	document.body.removeChild(shim);
 }
 
+function gotCalled(post){
+	if(post.recipients&&post.recipients.length!=0){
+		if(post.recipients[0]=="all"||post.recipients.indexOf(username.toLowerCase())!=-1){
+			return true;
+		}
+	}
+	return false;
+}
+
 var alerted = false;
 //on recieving any message from the server
 function onMessage(message){
@@ -431,11 +441,18 @@ function onMessage(message){
 	if(m.content){
 		//this was a post
 		recievePost(m);
+		//play a special tone when someone calls you, no matter what
+		//make function ifcalled(post)
+		if(gotCalled(m)&&!mute){
+			//play the tone
+			playAlert(true);
+		}
+		
 		if(!windowFocus&&!alerted){
 			setIcon("alert.ico");
 			document.title="* SavvyChat";
-			if(!disableAlert){
-				playAlert();
+			if(!disableAlert&&!gotCalled(m)&&!mute){
+				playAlert(false);
 			}
 			alerted = true;
 		}
@@ -460,38 +477,46 @@ function sendPost(){
 		var meta = RegExp.$1;
 		//worktext = RegExp.$3;
 		meta = meta.toLowerCase().replace(/\s/g,"");
-		if(meta=="logout"){
+		metahead = meta.split(":")[0]
+		switch(metahead){
+		case "logout":
 			//logout
 			location.href="{{ logouturl }}";
 			return;
-		}
-		if(meta=="hf"){
+			break;
+		case "hf":
 			//header and footer
 			verbose = !verbose;
 			fitWindow();
 			return;
-		}
-		if(meta=="help"){
+			break;
+		case "help":
 			//help
 			openHelp();
 			return;
-		}
-		if(meta=="tone"){
+			break;
+		case "tone":
 			//alert tone
 			document.getElementById("alertcheck").checked = !document.getElementById("alertcheck").checked;
 			toggleAlert(document.getElementById("alertcheck"));
 			return;
-		}
-		if(meta=="preview"){
+			break;
+		case "mute":
+			//mute
+			mute = !mute;
+			return;
+			break;
+		case "preview":
 			//preview
 			document.getElementById("previewcheck").checked = !document.getElementById("previewcheck").checked;
 			togglePreview(document.getElementById("previewcheck"));
 			return;
-		}
-		if(meta=="math"){
+			break;
+		case "math":
 			//math in preview
 			mathpreview = !mathpreview;
 			return;
+			break;
 		}
 	}
 	
@@ -646,10 +671,8 @@ function recievePost(post,ignoretopics,prepend){
 			MJQT("topic");
 		}
 	}else{
-		if(post.recipients&&post.recipients.length!=0){
-			if(post.recipients[0]=="all"||post.recipients.indexOf(username.toLowerCase())!=-1){
-				classtext=' callpost';
-			}
+		if(gotCalled(post)){
+			classtext=' callpost';
 		}
 	}
 	var quoteHTML = "";
@@ -663,14 +686,24 @@ function recievePost(post,ignoretopics,prepend){
 	newdiv.id = 'post' + currPostID;
 	newdiv.className = "post" + classtext;
 	var postlist=document.getElementById("archivelist");
-	//if(postlist.lastChild){
-		//if(postlist.lastChild.childNodes[1].innerHTML==parsedObj.authortext){
-			//newdiv.childNodes[1].style.display="None";
-		//}
-	//}
+	
 	if(!prepend){
+		//append
+		//hide author label for repeated posts by the same author
+		if(postlist.lastChild){
+			if(postlist.lastChild.childNodes[1].innerHTML == parsedObj.authortext){
+				newdiv.childNodes[1].style.display = "None";
+			}
+		}
 		postlist.appendChild(newdiv);
 	}else{
+		//prepend
+		//hide author label for repeated posts by the same author
+		if(postlist.firstChild){
+			if(postlist.firstChild.childNodes[1].innerHTML == parsedObj.authortext){
+				postlist.firstChild.childNodes[1].style.display = "None";
+			}
+		}
 		postlist.insertBefore(newdiv,postlist.firstChild)
 	}
 	MJQT("post"+currPostID);
@@ -736,22 +769,29 @@ function getHTMLfromSavvyCode(savvyCode, domath, author){
 	
 	//first check for a meta tag at the beginning of the text
 	var authortext=author + ": ";
-	var meta="";
+	var meta = "";
+	var metahead = ""
+	var multiline = true;
 	if(/^\|+([^\|]+?)(\|+|$)([\s\S]*)/.test(worktext)){
 		meta = RegExp.$1;
 		worktext = RegExp.$3;
 		meta = meta.toLowerCase().replace(/\s/g,"");
-		parts = meta.split(":");
+		var parts = meta.split(":");
+		metahead = parts[0]
 		var str;//helper string for some options
-		switch (parts[0]){
+		switch (metahead){
 		case "topic":
 			//topics don't have any multiline stuff
 			worktext = worktext.replace(/\n/g," ");
+			multiline = false;
 			authortext = author + " changed topic: ";
 			break
 		case "img":
 			return {meta:'img',html:'<img onerror="setTimeout(&quot;scrollDown()&quot;,1);" onload="setTimeout(&quot;scrollDown()&quot;,1);" src="' + worktext.replace(/\n/g,"") + '" />', authortext:authortext};
 			break;
+		case "me":
+			multiline = false;
+			worktext = worktext.replace(/\n/g," ");
 		case "call":
 			var recipientText;
 			if(parts.length == 1){
@@ -779,6 +819,11 @@ function getHTMLfromSavvyCode(savvyCode, domath, author){
 			str = "enable";
 			if(!disableAlert) str = "disable";
 			return {meta:'tone',html:'<strong>Special command to '+str+' the alert tone (will not send)</strong>', authortext:authortext};
+			break;
+		case "mute":
+			str = "mute";
+			if(mute) str = "unmute";
+			return {meta:'tone',html:'<strong>Special command to '+str+' all sounds, including the call tone (will not send)</strong>', authortext:authortext};
 			break;
 		case "preview":
 			str = "enable"
@@ -812,14 +857,14 @@ function getHTMLfromSavvyCode(savvyCode, domath, author){
 	output=output.replace(/\/\/([\s\S]*?)\/\//g,'<em>$1</em>').replace(/\/\/([\s\S]*?)$/,'<em>$1</em>')
 	output=output.replace(/__([\s\S]*?)__/g,'<span class="strikethrough">$1</span>').replace(/__([\s\S]*?)$/,'<span class="strikethrough">$1</span>');
 	
-	if(meta != "topic"){
+	if(multiline){
 		//add quotes
 		output="\r"+output+"\r";
 		output=output.replace(/([\r\n]&gt;.*?)+[\r\n]/g,addQuotes);
 	}
 	
 	//put back code
-	if(meta != "topic") output="\r"+output+"\r";
+	if(multiline) output="\r"+output+"\r";
 	codeparts = output.split("`");
 	output = interleave(codeparts,codehash,'<span class="code">','</span>','<pre class="code">','</pre>');
 	
@@ -832,7 +877,7 @@ function getHTMLfromSavvyCode(savvyCode, domath, author){
 	output = interleave(linkparts,linkhashurl,'','','','');
 	
 	//put back math
-	if(meta != "topic") output="\r"+output+"\r";
+	if(multiline) output="\r"+output+"\r";
 	mathparts=output.split("$$");
 	if(domath){
 		output=interleave(mathparts, mathhash,'\\(','\\)','$$',' $$');
@@ -842,7 +887,9 @@ function getHTMLfromSavvyCode(savvyCode, domath, author){
 	
 	//add newlines
 	output=output.replace(/\r/g,'').replace(/\n/g,'<br />');
-	
+	if(metahead == "me"){
+		return {meta:meta,html:"",authortext:username + " " + output};
+	}
 	return {meta:meta,html:output,authortext:authortext};
 }
 
@@ -1202,7 +1249,7 @@ function goToView(dest) {
 			</form>
 		</div>
 		<div id="footer">
-			SavvyChat was built with the <a href="http://code.google.com/appengine/">Google App Engine SDK</a> by <a href="mailto:fearthekwan@gmail.com">Matthew Kwan</a> for private use. Last update was on 28 Jan 2011.
+			SavvyChat was built with the <a href="http://code.google.com/appengine/">Google App Engine SDK</a> by <a href="mailto:fearthekwan@gmail.com">Matthew Kwan</a> for private use. Last update was on 31 Jan 2011.
 		</div>
 	</div>
 </div>
