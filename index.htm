@@ -8,8 +8,8 @@
 <link type="text/css" rel="stylesheet" href="/stylesheets/main.css" />
 <style type="text/css">
 body{
-overflow:hidden;
-margin:0;
+overflow: hidden;
+margin: 0;
 }
 h1,h2,h3,h4{
 margin-top: 0;
@@ -23,9 +23,9 @@ color: #EEE;
 background-color: #EEE;
 height: 3px;
 border: None;
-margin-left:20px;
-margin-right:20px;
-margin-bottom:0;
+margin-left: 20px;
+margin-right: 20px;
+margin-bottom: 0;
 }
 
 #preview .code{
@@ -45,20 +45,20 @@ background-color: #DDD;
 }
 div.mathplaceholderblock{
 font-family: Courier New, monospace;
-text-align:center;
+text-align: center;
 }
 span.mathplaceholderinline{
 font-family: Courier New, monospace;
 }
 
 blockquote{
-border:solid;
-border-left:none;
-border-right:none;
-border-color:#EEE;
-border-width:2px;
-margin-left:20px;
-margin-right:20px;
+border: solid;
+border-left: none;
+border-right: none;
+border-color: #EEE;
+border-width: 2px;
+margin-left: 20px;
+margin-right: 20px;
 }
 #preview blockquote{
 border-color: #BBF;
@@ -78,11 +78,11 @@ text-align: center;
 margin-left: auto ;
 margin-right: auto ;
 width: 150px;
-background-color:#FFF;
-border:solid;
-border-top:none;
-border-color:#DDD;
-border-width:3px;
+background-color: #FFF;
+border: solid;
+border-top: none;
+border-color: #DDD;
+border-width: 3px;
 }
 
 #container{
@@ -95,13 +95,13 @@ margin-right: auto ;
 width: 900px;
 position: relative;
 {% if not gadget %}
-background-color:#FFF;
+background-color: #FFF;
 {% endif %}
-border:solid;
-border-top:none;
-border-bottom:none;
-border-color:#DDD;
-border-width:3px;
+border: solid;
+border-top: none;
+border-bottom: none;
+border-color: #DDD;
+border-width: 3px;
 }
 #header, #archive, #compose, #footer{
 padding: 10px;
@@ -113,69 +113,70 @@ padding-right: 0px;
 
 #header{
 text-align: center;
-padding-bottom:30px;
+padding-bottom: 30px;
 }
 .headerLeft{
-position:absolute;
-width:200px;
-text-align:right;
-right:10px;
+position: absolute;
+width: 200px;
+text-align: right;
+right: 10px;
 }
 #subtitle{
-position:absolute;
-width:900px;
-left:0;
+position: absolute;
+width: 900px;
+left: 0;
 }
 #helpTag{
-position:absolute;
-width:200px;
-text-align:left;
-left:10px;
+position: absolute;
+width: 200px;
+text-align: left;
+left: 10px;
 }
 #logoutTag{
-position:absolute;
-width:200px;
-text-align:right;
-right:10px;
+position: absolute;
+width: 200px;
+text-align: right;
+right: 10px;
 }
 
 #archive{
 {% if not gadget %}
-background-color:#EEE;
+background-color: #EEE;
 {% endif %}
 }
 #topic{
 {% if gadget %}
-background-color:#FFF;
-padding-top:4px;
-padding-left:5px;
-padding-right:5px;
+background-color: #FFF;
+padding-top: 4px;
+padding-left: 5px;
+padding-right: 5px;
 -moz-border-radius: 5px;
 border-radius: 5px;
 {% endif %}
-font-weight:bold;
-margin-bottom:15px;
-height:20px;
-overflow:hidden;
+font-weight: bold;
+margin-bottom: 15px;
+height: 20px;
+overflow: hidden;
+white-space: nowrap;
 }
 #topic strong{
-font-size:120%;
+font-size: 120%;
 }
 #postlist{
 overflow: auto;
-overflow-x:hidden;
-width:880px;
-height:400px;
+overflow-x: hidden;
+width: 880px;
+height: 400px;
 }
 .post{
-background-color:#FFF;
+background-color: #FFF;
 padding: 10px;
 {% if gadget %}
 -moz-border-radius: 5px;
 border-radius: 5px;
 padding: 5px;
 {% endif %}
-margin-top:3px;
+margin-top: 3px;
 
 white-space: pre-wrap;      /* CSS3 */   
 white-space: -moz-pre-wrap; /* Firefox */    
@@ -185,7 +186,7 @@ word-wrap: break-word;      /* IE */
 }
 
 .joinedattop{
-margin-top:0;
+margin-top: 0;
 border-top-right-radius: 0;
 border-top-left-radius: 0;
 -moz-border-radius-topright: 0;
@@ -201,65 +202,65 @@ border-bottom-left-radius: 0;
 
 .author{
 
-font-weight:bold;
-margin-bottom:5px;
+font-weight: bold;
+margin-bottom: 5px;
 }
 .datelabel{
-margin-left:10px;
-float:right;
-text-align:right;
-font-size:70%;
+margin-left: 10px;
+float: right;
+text-align: right;
+font-size: 70%;
 {% if gadget %}
-display:None;
+display: None;
 {% endif %}
 }
 .callpost{
-background-color:#FDC;
+background-color: #FDC;
 }
 .topicpost{
-background-color:#EFD;
+background-color: #EFD;
 }
 .notifypost{
-background-color:#EEE;
+background-color: #EEE;
 }
 #previewpost{
-background-color:#DDF;
+background-color: #DDF;
 }
 #previewlabel{
-margin-left:10px;
-float:right;
-text-align:right;
-color:#669;
+margin-left: 10px;
+float: right;
+text-align: right;
+color: #669;
 }
 
 #compose{
 {% if not gadget %}
-background-color:#DDD;
+background-color: #DDD;
 {% endif %}
 }
 #composefield{
 {% if gadget %}
 -moz-border-radius: 5px;
 border-radius: 5px;
-margin-top:-5px;
+margin-top: -5px;
 {% endif %}
--webkit-box-sizing:border-box;
--moz-box-sizing:border-box;
-box-sizing:border-box;
-width:880px;
-height:100px;
-margin-bottom:10px;
+-webkit-box-sizing: border-box;
+-moz-box-sizing: border-box;
+box-sizing: border-box;
+width: 880px;
+height: 100px;
+margin-bottom: 10px;
 }
 #controls{
 {% if gadget %}
 -moz-border-radius: 5px;
 border-radius: 5px;
-background-color:#FFF;
+background-color: #FFF;
 {% endif %}
 }
 #postbutton{
-height:50px;
-width:150px;
+height: 50px;
+width: 150px;
 }
 
 #footer{
@@ -1156,26 +1157,35 @@ function fitWindow(){
 			}
 		}
 	}
-	if(widthchanged||wh!=windowHeight()){
+	if(widthchanged || wh != windowHeight()){
 		wh=windowHeight();
 		var availablepx = wh;
-		if(ww<900||wh<600||!verbose){
-			document.getElementById('header').style.display="None";
-			document.getElementById('footer').style.display="None";
+		if(ww < 900 || wh < 600 || !verbose){
+			document.getElementById('header').style.display = "None";
+			document.getElementById('footer').style.display = "None";
 		}else{
-			document.getElementById('header').style.display="Block";
-			document.getElementById('footer').style.display="Block";
-			availablepx-=document.getElementById('header').offsetHeight;
-			availablepx-=document.getElementById('footer').offsetHeight;
+			document.getElementById('header').style.display = "Block";
+			document.getElementById('footer').style.display = "Block";
+			availablepx -= document.getElementById('header').offsetHeight;
+			availablepx -= document.getElementById('footer').offsetHeight;
 		}
-		var apx2=Math.min(Math.max(0,wh-525),75);
-		apx2-=Math.round(apx2/3);
-		document.getElementById('postbutton').style.height=25+Math.round(apx2/3)+"px";
-		document.getElementById('composefield').style.height=apx2+50+"px";
+		var apx2 = Math.min(Math.max(0,wh-525),75);
+		apx2 -= Math.round(apx2/3);
+		document.getElementById('postbutton').style.height = 25+Math.round(apx2/3)+"px";
+		document.getElementById('composefield').style.height = apx2+50+"px";
 		availablepx -= document.getElementById('compose').offsetHeight + document.getElementById('topic').offsetHeight + 15 + 20;
 		document.getElementById('postlist').style.height = availablepx+"px";
 	}
 	scrollDown();
+}
+
+var mInt;
+function marquee(){
+	mInt = setInterval("document.getElementById('topic').scrollLeft += 4;",50);
+}
+function unmarquee(){
+	clearInterval(mInt);
+	document.getElementById('topic').scrollLeft = 0;
 }
 
 function onLoadBody(){
@@ -1308,7 +1318,7 @@ function goToView(dest) {
 			<div id="logoutTag"><a href="{{ logouturl }}">Logout</a></div>
 		</div>
 		<div id="archive">
-		<div id="topic">{{ topic }}</div>
+		<div onmouseover="marquee();" onmouseout="unmarquee();" id="topic">{{ topic }}</div>
 		<div id="postlist" onscroll="setScrollLock();">
 			{% if showarchive %}
 			<div id="viewarchivetag" class="post" style="text-align:center;font-weight:bold;margin-top:0;"><a href="" onclick="retrieveArchive();return false;">^ view older ^</a></div>

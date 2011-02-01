@@ -192,10 +192,10 @@ class PostPage(webapp.RequestHandler):
 					post.recipients = list(Set(callstring.split(",")[1:-1]))
 					if "all" in post.recipients:
 						post.recipients = ["all"]
-		#if metahead != "notify":
-		post.put()
-		#else:
-		#post.date = datetime.now()
+		if metahead != "notify":
+			post.put()
+		else:
+			post.date = datetime.now()
 		broadcast(post)
 		authoruser = getUserFromId(post.author)
 		authoruser.put()
