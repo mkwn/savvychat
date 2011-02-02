@@ -21,7 +21,7 @@ import re
 
 import traceback
 
-MAXPOSTS = 30 #max number of posts initialized
+MAXPOSTS = 100 #max number of posts initialized
 EXTRAPOSTS = 10 #number of posts recieved when "view older" is checked.
 
 #http://stackoverflow.com/questions/2350454/simplest-way-to-store-a-value-in-google-app-engine-python

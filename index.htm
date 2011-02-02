@@ -185,6 +185,10 @@ white-space: -o-pre-wrap;   /* Opera 7 */
 word-wrap: break-word;      /* IE */
 }
 
+.ellipsis{
+color:red;
+}
+
 .joinedattop{
 margin-top: 0;
 border-top-right-radius: 0;
@@ -198,6 +202,13 @@ border-bottom-right-radius: 0;
 border-bottom-left-radius: 0;
 -moz-border-radius-bottomright: 0;
 -moz-border-radius-bottomleft: 0;
+}
+
+.withscrollbar .post{
+border-top-right-radius: 0;
+border-bottom-right-radius: 0;
+-moz-border-radius-topright: 0;
+-moz-border-radius-bottomright: 0;
 }
 
 .author{
@@ -328,6 +339,20 @@ var mute = false;
 var socket;
 }
 
+//http://snipplr.com/view/3561/addclass-removeclass-hasclass/
+function hasClass(ele,cls) {
+	return ele.className.match(new RegExp('(\\s|^)'+cls+'(\\s|$)'));
+}
+function addClass(ele,cls) {
+	if (!this.hasClass(ele,cls)) ele.className += " "+cls;
+}
+function removeClass(ele,cls) {
+	if (hasClass(ele,cls)) {
+    	var reg = new RegExp('(\\s|^)'+cls+'(\\s|$)');
+		ele.className=ele.className.replace(reg,' ');
+	}
+}
+
 //http://www.geekdaily.net/2007/07/04/javascript-cross-browser-window-size-and-centering/
 function windowHeight(){
 	if(!window.innerWidth)	{
@@ -370,11 +395,17 @@ function openChannel(){
 	socket.onmessage = onMessage;
 }
 
+var excess = 0;
 //send any message to server
 function sendMessage(path, opt_param){
 		path += '?u='+ userid+'&t='+tokenid;
 		if (opt_param){
 			path += '&' + opt_param;
+		}
+		if(path.length > 2026){
+			//this seems to be the limit to send in a single post
+			excess = path.length - 2026;
+			return false;
 		}
 		var xhr = new XMLHttpRequest();
 		xhr.open('POST', path, true);
@@ -407,9 +438,13 @@ function onClose(){
 	//sendMessage('/closed');
 	document.getElementById('postbutton').disabled = true;
 	disableSend = true;
-	var post = {content:"|notify|Session expired or failed. Savvychat will attempt to aquire a new connection, but possibly you may need to refresh the page.", author:"SavvyChat", date:"", recipients:[]};
-	recievePost(post);
+	displayNote("Session expired or failed. Savvychat will attempt to aquire a new connection, but possibly you may need to refresh the page.");
 	//alert("SavvyChat session expired or broke.");
+}
+
+function displayNote(text){
+	var post = {content:"|notify|"+text, author:"SavvyChat", date:"", recipients:[]};
+	recievePost(post);
 }
 
 var snd;
@@ -510,8 +545,10 @@ function onMessage(message){
 function sendPost(){
 	var text = document.getElementById("composefield").value.replace(/\r/g,"");
 	//get meta in case it's an option, in that case we want to set the option and not send
+	var meta = "";
+	var metahead;
 	if(/^\|+([^\|]+?)(\|+|$)([\s\S]*)/.test(text)){
-		var meta = RegExp.$1;
+		meta = RegExp.$1;
 		//worktext = RegExp.$3;
 		meta = meta.toLowerCase().replace(/\s/g,"");
 		metahead = meta.split(":")[0]
@@ -559,18 +596,64 @@ function sendPost(){
 	
 	if(disableSend)return;
 	
-	if(text=="")return;
+	if(text == "") return;
+	if (sendMessage('/post', 'p=' + encodeURIComponent(text))){
+		//yay
+	}else{
+		if(meta != ""){
+			displayNote('Tagged message too long, was not sent. Remove "' + metahead + '" tag from your message or shorten it.');
+			return;
+		}
+		var partNo = 1;
+		enctext = encodeURIComponent(text);
+		var blockSize = enctext.length - excess; //i don't want to hardcode it in case i change something in sendMessage
+		while(1){
+			//for each part
+			var meta = encodeURIComponent("|cont:" + (partNo-1) + "," + partNo + "|");
+			var available = blockSize - meta.length;
+			var part = enctext.substr(0, available);
+			var escIdx = part.substr(part.length-2,2).indexOf("%");
+			if(escIdx != -1){
+				//we got a portion of an escape sequence
+				available -= 2 - escIdx;
+				part = part.substr(0, available);
+			}
+			//we might still have a portion of a unicode escape sequence
+			while(1){
+				var clearpart;
+				try{
+					clearpart = decodeURIComponent(part);
+				}catch(err){
+					clearpart = String.fromCharCode(text.charCodeAt(0)+1);
+				}
+				if(clearpart == text.substr(0,clearpart.length)){
+					//we're good
+					text = text.substr(clearpart.length);
+					break;
+				}
+				available -= 3;
+				part = part.substr(0, available);
+			}
+			enctext = enctext.substr(available);
+			if(enctext == ""){
+				//done
+				sendMessage('/post', 'p=' + encodeURIComponent("|cont:" + (partNo-1) + ",0|") + part)
+				break;
+			}
+			sendMessage('/post', 'p=' + meta + part)
+			partNo ++;
+		}
+	}
 	document.getElementById("preview").innerHTML="";
 	document.getElementById("authorpreview").innerHTML = username+":";
 	document.getElementById("composefield").value="";
-	sendMessage('/post', 'p=' + encodeURIComponent(text));
 	//recievePost({content:document.getElementById("composefield").value,author:username,date:"1/3/11, 13:30 EST"});
 }
 
 //call the server for some archive
 function retrieveArchive(posts){
 	var xhr = sendMessage('/retrieve','c=' + encodeURIComponent(querycursor));
-	document.getElementById("viewarchivetag").innerHTML="loading..."
+	document.getElementById("viewarchivetag").innerHTML = "loading...";
 	//using AJAX for the reply seems marginally more reliable than COMET, but I'm not certain. Original COMET code is commented out in onMessage.
 	xhr.onreadystatechange = function(){
 		if(xhr.readyState == 4){
@@ -656,10 +739,6 @@ function autoquote(content,author,date){
 		worktext = RegExp.$3;
 	}
 	
-	//find something formatted like a link
-	worktext="\r"+worktext+"\r";
-	worktext=worktext.replace(/(\s)((ht|f)tp(s?)\:\/\/[\S]*)(\s)/g,"$1[[$2]]$5")
-	
 	//hash code and math
 	var codehash = [];
 	var mathhash = [];
@@ -708,6 +787,9 @@ function MJQT(id){
 	if(!disableMath)MathJax.Hub.Queue(["Typeset",MathJax.Hub,id]);
 }
 
+var appendChain = [];//for long messages
+var prependChain = [];
+var chainOpen = true;//are all the posts loaded part of a long message?
 //process post and add to list
 function recievePost(post,ignoretopics,prepend){
 	var cachedmathpreview = mathpreview;
@@ -721,6 +803,101 @@ function recievePost(post,ignoretopics,prepend){
 	var parsedDate = formatDate(postdate);
 	var classtext = "";
 	var metahead = parsedObj.meta.split(":")[0];
+	if(metahead == "cont"){
+		//long message
+		var anchors = parsedObj.meta.split(":")[1].split(",")
+		text = post.content.substr(("|"+parsedObj.meta+"|").length)//I can only do this because |cont | is never entered by the user
+		var html;
+		if(!prepend){
+			if(appendChain.length == 0 || appendChain[appendChain.length-1].anchors[1] != anchors[0] || appendChain[0].author != post.author){
+				//new chain
+				appendChain = [{content:text,anchors:anchors,author:post.author,divId:'post' + currPostID}];
+				if(chainOpen){
+					prependChain = [{content:text,anchors:anchors,author:post.author,divId:'post' + currPostID}];
+				}
+			}else{
+				appendChain.push({content:text,anchors:anchors,author:post.author,divId:appendChain[0].divId});
+				if(chainOpen){
+					prependChain.push({content:text,anchors:anchors,author:post.author,divId:appendChain[0].divId});
+				}
+				var totaltext = "";
+				for(var i = 0; i < appendChain.length; i ++){
+					totaltext += appendChain[i].content;
+				}
+				html = getHTMLfromSavvyCode(totaltext, true, post.author).html;
+				if(anchors[1] != "0"){
+					html += '<span class="ellipsis" title="incomplete post">...</span>';
+				}
+				document.getElementById(appendChain[0].divId).childNodes[2].innerHTML = html;
+				var date = document.getElementById(appendChain[0].divId).firstChild.firstChild.innerHTML;
+				document.getElementById(appendChain[0].divId).firstChild.firstChild.onclick = function(){
+					autoquote(totaltext,post.author,date);
+					return false;
+				}
+				if(anchors[1] == "0"){
+					//done
+					chainOpen = false;
+					appendChain = [];
+				}
+				return;
+			}
+		}else{
+			if(prependChain.length == 0 || prependChain[0].anchors[0] != anchors[1] || prependChain[0].author != post.author){
+				//new chain
+				prependChain = [{content:text,anchors:anchors,author:post.author,divId:'post' + currPostID}];
+				if(chainOpen){
+					appendChain = [{content:text,anchors:anchors,author:post.author,divId:'post' + currPostID}];
+				}
+			}else{
+				prependChain.unshift({content:text,anchors:anchors,author:post.author,divId:prependChain[0].divId});
+				if(chainOpen){
+					appendChain.unshift({content:text,anchors:anchors,author:post.author,divId:prependChain[0].divId});
+				}
+				var totaltext = "";
+				for(var i = 0; i < prependChain.length; i ++){
+					totaltext += prependChain[i].content;
+				}
+				html = getHTMLfromSavvyCode(totaltext, true, post.author).html;
+				if(anchors[0] != "0"){
+					html = '<span class="ellipsis" title="incomplete post">...</span>' + html;
+				}
+
+				document.getElementById(prependChain[0].divId).childNodes[2].innerHTML = html;
+				document.getElementById(prependChain[0].divId).firstChild.firstChild.onclick = function(){
+					autoquote(totaltext,post.author,parsedDate);
+					return false;
+				}
+				document.getElementById(prependChain[0].divId).firstChild.firstChild.innerHTML = parsedDate;
+				if(anchors[0] == "0"){
+					//done
+					chainOpen = false;
+					prependChain = [];
+				}
+				return;
+			}
+		}
+		if(anchors[0] != "0"){
+			parsedObj.html = '<span class="ellipsis" title="incomplete post">...</span>' + parsedObj.html;
+		}else{
+			//done
+			chainOpen = false;
+			prependChain = [];
+		}
+		if(anchors[1] != "0"){
+			parsedObj.html += '<span class="ellipsis" title="incomplete post">...</span>';
+		}else{
+			//done
+			chainOpen = false;
+			appendChain = [];
+		}
+	}else{
+		chainOpen = false;
+		if(prepend){
+			prependChain = [];
+		}else{
+			appendChain = [];
+		}
+	}
 	if(metahead == 'topic'){
 		classtext = ' topicpost';
 		if(!ignoretopics){
@@ -734,17 +911,23 @@ function recievePost(post,ignoretopics,prepend){
 		classtext = ' notifypost';
 	}else{
 		if(gotCalled(post)){
-			classtext=' callpost';
+			classtext = ' callpost';
 		}
 	}
-	var quoteHTML = "";
-	if(parsedObj.meta != "topic" && parsedObj.meta != "img"){
-		var escapedPost = post.content.replace(/\\/g,"\\\\").replace(/\n/g,"\\n").replace(/"/g,"\\&quot;");
-		quoteHTML = '<a href="" onclick="autoquote(&quot;'+escapedPost+'&quot;,&quot;'+post.author+'&quot;,&quot;'+parsedDate+'&quot;);return false;" title="quote this post">'+parsedDate+'</a>';
-	}
+	var quoteHTML = '<a>'+parsedDate+'</a>';
+	//if(metahead != "cont"){
+		//var escapedPost = post.content.replace(/\\/g,"\\\\").replace(/\n/g,"\\n").replace(/"/g,"\\&quot;");
+		//quoteHTML = '<a href="" onclick="autoquote(&quot;'+escapedPost+'&quot;,&quot;'+post.author+'&quot;,&quot;'+parsedDate+'&quot;);return false;" title="quote this post">'+parsedDate+'</a>';
+	//}
 	var divHTML='<div class="datelabel">'+quoteHTML+'</div><span class="author">'+parsedObj.authortext+'</span><span class="postcontent">' + parsedObj.html + '</span>';
 	var newdiv = document.createElement('div');
 	newdiv.innerHTML = divHTML;
+	newdiv.firstChild.firstChild.href = "";
+	newdiv.firstChild.firstChild.title = "quote this post";
+	newdiv.firstChild.firstChild.onclick = function(){
+		autoquote(post.content,post.author,parsedDate);
+		return false;
+	}
 	newdiv.id = 'post' + currPostID;
 	newdiv.className = "post" + classtext;
 	var postlist=document.getElementById("archivelist");
@@ -870,9 +1053,6 @@ function getHTMLfromSavvyCode(savvyCode, domath, author){
 			multiline = false;
 			worktext = worktext.replace(/\n/g," ");
 			break;
-		case "notify":
-			//
-			break;
 		case "call":
 			var recipientText;
 			if(parts.length == 1){
@@ -882,6 +1062,12 @@ function getHTMLfromSavvyCode(savvyCode, domath, author){
 				recipientText = parts.join(":").replace(/,/g,", ");
 			}
 			authortext = author + " calls "+ recipientText + ": ";
+			break;
+		case "notify":
+			//
+			break;
+		case "cont":
+			//
 			break;
 			
 		//check for options
@@ -924,7 +1110,7 @@ function getHTMLfromSavvyCode(savvyCode, domath, author){
 	if(worktext == "") worktext = " ";
 	//find something formatted like a link
 	worktext="\r"+worktext+"\r";
-	worktext=worktext.replace(/(\s)((ht|f)tp(s?)\:\/\/[\S]*)(\s)/g,"$1[[$2]]$5")
+	worktext=worktext.replace(/([\s&gt;])((ht|f)tp(s?)\:\/\/[\S]*)(\s)/g,"$1[[$2]]$5")
 	
 	//hash code and math so we can do formatting on the rest
 	var codehash = [];
@@ -1064,18 +1250,24 @@ function insertAroundCursor(textarea, tag) {
 	}
 }
 
-var scrollLocked=true;
-var autoscrolling=false;
+var scrollLocked = true;
+var autoscrolling = false;
 function scrolledDown(){
 	var posts = document.getElementById("postlist");
-	return posts.scrollTop == posts.scrollHeight-posts.offsetHeight;
+	return posts.scrollTop == posts.scrollHeight - posts.offsetHeight;
 }
 
 //if user set the scroll to the bottom of the postlist, scroll down automatically
 function scrollDown(){
+	var posts = document.getElementById("postlist");
+	if(posts.clientHeight < posts.scrollHeight){
+		//scrollbar
+		addClass(posts,"withscrollbar");
+	}else{
+		removeClass(posts,"withscrollbar");
+	}
 	if(scrollLocked){
 		autoscrolling = true;//flag so that onscroll doesn't get called again
-		var posts = document.getElementById("postlist");
 		posts.scrollTop = posts.scrollHeight - posts.offsetHeight;
 		autoscrolling = false;
 	}
