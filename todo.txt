@@ -3,16 +3,18 @@ I had an issue where the preview text was not inline with the authortext in the 
 limit topic length
 resend token on expiry
 	as well as the token, all posts in the downtime should be resent (use cursor)
-join |cont| posts
-	autoquote
 secure to prevent impersonation etc.
 autosend messages that happen between page load and onopen (use cursor)
 call should have a special tone
 logoff should close token
 time out all requests and verify that sent posts are recieved
 don't update lastonline in resolvestragglers
+clean up long message sending
+sometimes long messsages have partial percent-escapes only in deployed version
+store icon binary in javascript
 
 PRIORITY 1: IMPORTANT
+color code names
 dot points/numbered points
 clicking on a name should do something, maybe call?
 periodically send a refresher so resolvestragglers is more accurate than 2 hours

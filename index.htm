@@ -397,19 +397,27 @@ function openChannel(){
 
 var excess = 0;
 //send any message to server
-function sendMessage(path, opt_param){
+function sendMessage(path, opt){
 		path += '?u='+ userid+'&t='+tokenid;
-		if (opt_param){
-			path += '&' + opt_param;
+		if (opt && opt.param){
+			path += '&' + opt.param;
 		}
-		if(path.length > 2026){
+		if(path.length > 2018){
 			//this seems to be the limit to send in a single post
-			excess = path.length - 2026;
+			excess = path.length - 2018;//2026 seems to be the limit but it causes some bug with percent-escapes, 2018 seems to work but I don't actually understand the bug
 			return false;
 		}
 		var xhr = new XMLHttpRequest();
 		xhr.open('POST', path, true);
 		xhr.send();
+		xhr.onreadystatechange = function(){
+			if(xhr.readyState == 4){
+				xhr.onreadystatechange = function(){};
+				if(opt && opt.callback){
+					opt.callback(xhr.responseText);
+				}
+			}
+		};
 		return xhr;
 }
 
@@ -418,26 +426,26 @@ function onOpen(){
 	sendMessage('/opened');
 }
 
+function allowSend(allow){
+	disableSend = !allow;
+	document.getElementById('postbutton').disabled = !allow;
+}
+
 //when the connection expires
 function onClose(){
 	socket.onclose = function(){};
 	socket.onerror = function(){};
 	socket.close();
-	var xhr = sendMessage('/token');
-	xhr.onreadystatechange = function(){
-		if(xhr.readyState == 4){
-			xhr.onreadystatechange = function(){};
-			var arr = xhr.responseText.split("@@")
-			tokenid = arr.shift();
-			token = arr.join("@@");
-			openChannel();
-			document.getElementById('postbutton').disabled = false;
-			disableSend = false;
-		}
+	var callback = function(response){
+		var arr =response.split("@@")
+		tokenid = arr.shift();
+		token = arr.join("@@");
+		openChannel();
+		allowSend(true);
 	};
+	sendMessage('/token',{callback:callback});
 	//sendMessage('/closed');
-	document.getElementById('postbutton').disabled = true;
-	disableSend = true;
+	allowSend(false);
 	displayNote("Session expired or failed. Savvychat will attempt to aquire a new connection, but possibly you may need to refresh the page.");
 	//alert("SavvyChat session expired or broke.");
 }
@@ -561,6 +569,7 @@ function sendPost(){
 		case "hf":
 			//header and footer
 			verbose = !verbose;
+			wh = 0;//force a refit
 			fitWindow();
 			return;
 			break;
@@ -597,76 +606,84 @@ function sendPost(){
 	if(disableSend)return;
 	
 	if(text == "") return;
-	if (sendMessage('/post', 'p=' + encodeURIComponent(text))){
+	var callback = function(response){
+		allowSend(true);
+	};
+	var enctext = encodeURIComponent(text);
+	if (sendMessage('/post', {param: 'p=' + enctext, callback: callback})){
 		//yay
+		//wait until we get a verify
 	}else{
 		if(meta != ""){
 			displayNote('Tagged message too long, was not sent. Remove "' + metahead + '" tag from your message or shorten it.');
 			return;
 		}
 		var partNo = 1;
-		enctext = encodeURIComponent(text);
 		var blockSize = enctext.length - excess; //i don't want to hardcode it in case i change something in sendMessage
-		while(1){
-			//for each part
-			var meta = encodeURIComponent("|cont:" + (partNo-1) + "," + partNo + "|");
-			var available = blockSize - meta.length;
-			var part = enctext.substr(0, available);
-			var escIdx = part.substr(part.length-2,2).indexOf("%");
-			if(escIdx != -1){
-				//we got a portion of an escape sequence
-				available -= 2 - escIdx;
-				part = part.substr(0, available);
-			}
-			//we might still have a portion of a unicode escape sequence
-			while(1){
-				var clearpart;
-				try{
-					clearpart = decodeURIComponent(part);
-				}catch(err){
-					clearpart = String.fromCharCode(text.charCodeAt(0)+1);
-				}
-				if(clearpart == text.substr(0,clearpart.length)){
-					//we're good
-					text = text.substr(clearpart.length);
-					break;
-				}
-				available -= 3;
-				part = part.substr(0, available);
-			}
-			enctext = enctext.substr(available);
-			if(enctext == ""){
-				//done
-				sendMessage('/post', 'p=' + encodeURIComponent("|cont:" + (partNo-1) + ",0|") + part)
-				break;
-			}
-			sendMessage('/post', 'p=' + meta + part)
-			partNo ++;
-		}
+		processParts(partNo, blockSize, text, enctext)
 	}
+	allowSend(false);
 	document.getElementById("preview").innerHTML="";
 	document.getElementById("authorpreview").innerHTML = username+":";
 	document.getElementById("composefield").value="";
 	//recievePost({content:document.getElementById("composefield").value,author:username,date:"1/3/11, 13:30 EST"});
 }
 
+function processParts(partNo, blockSize, text, enctext){
+	var meta = encodeURIComponent("|cont:" + (partNo-1) + "," + partNo + "|");
+	var available = blockSize - meta.length;
+	var part = enctext.substr(0, available);
+	var escIdx = part.substr(part.length-2,2).indexOf("%");
+	if(escIdx != -1){
+		//we got a portion of an escape sequence
+		available -= 2 - escIdx;
+		part = part.substr(0, available);
+	}
+	//we might still have a portion of a unicode escape sequence
+	while(1){
+		var clearpart;
+		try{
+			clearpart = decodeURIComponent(part);
+		}catch(err){
+			clearpart = String.fromCharCode(text.charCodeAt(0)+1);
+		}
+		if(clearpart == text.substr(0,clearpart.length)){
+			//we're good
+			text = text.substr(clearpart.length);
+			break;
+		}
+		available -= 3;
+		part = part.substr(0, available);
+	}
+	enctext = enctext.substr(available);
+	var callback = function(response){
+		processParts(partNo+1, blockSize, text, enctext);
+	};
+	var postcontent = meta + part
+	if(enctext == ""){
+		//done
+		callback = function(response){
+			allowSend(true);
+		};
+		postcontent = encodeURIComponent("|cont:" + (partNo-1) + ",0|") + part
+	}
+	sendMessage('/post', {param: 'p=' + postcontent, callback: callback});
+}
+
 //call the server for some archive
 function retrieveArchive(posts){
-	var xhr = sendMessage('/retrieve','c=' + encodeURIComponent(querycursor));
-	document.getElementById("viewarchivetag").innerHTML = "loading...";
-	//using AJAX for the reply seems marginally more reliable than COMET, but I'm not certain. Original COMET code is commented out in onMessage.
-	xhr.onreadystatechange = function(){
-		if(xhr.readyState == 4){
-			xhr.onreadystatechange = function(){};
-			var m = JSON.parse(xhr.responseText);
-			document.getElementById("viewarchivetag").innerHTML='<a href="" onclick="retrieveArchive();return false;">^ view older ^</a>'
-			recieveArchive(m.posts);
-			querycursor = m.cursor;
-			if(!m.showarchive){
-				document.getElementById("viewarchivetag").style.display = "None"
-			}
+	var callback = function(response){
+		var m = JSON.parse(response);
+		document.getElementById("viewarchivetag").innerHTML='<a href="" onclick="retrieveArchive();return false;">^ view older ^</a>'
+		recieveArchive(m.posts);
+		querycursor = m.cursor;
+		if(!m.showarchive){
+			document.getElementById("viewarchivetag").style.display = "None";
 		}
 	};
+	sendMessage('/retrieve', {param: 'c=' + encodeURIComponent(querycursor), callback: callback});
+	document.getElementById("viewarchivetag").innerHTML = "loading...";
+	//using AJAX for the reply seems marginally more reliable than COMET, but I'm not certain. Original COMET code is commented out in onMessage.
 }
 
 //process the archive
@@ -1296,10 +1313,10 @@ function togglePreview(checkbox){
 function toggleAlert(checkbox){
 	if(checkbox.checked){
 		disableAlert = false;
-		sendMessage('/tone','a=true');
+		sendMessage('/tone', {param: 'a=true'});
 	}else{
 		disableAlert = true;
-		sendMessage('/tone','a=false');
+		sendMessage('/tone', {param: 'a=false'});
 	}
 }
 
@@ -1532,7 +1549,7 @@ function goToView(dest) {
 			</form>
 		</div>
 		<div id="footer">
-			SavvyChat was built with the <a href="http://code.google.com/appengine/">Google App Engine SDK</a> by <a href="mailto:fearthekwan@gmail.com">Matthew Kwan</a> for private use. Last update was on 31 Jan 2011.
+			SavvyChat was built with the <a href="http://code.google.com/appengine/">Google App Engine SDK</a> by <a href="mailto:fearthekwan@gmail.com">Matthew Kwan</a> for private use. Last update was on 2 Feb 2011.
 		</div>
 	</div>
 </div>
