@@ -1,19 +1,17 @@
 PRIORITY 0: DEFECTS
 I had an issue where the preview text was not inline with the authortext in the label
 limit topic length
-resend token on expiry
-	as well as the token, all posts in the downtime should be resent (use cursor)
 secure to prevent impersonation etc.
-autosend messages that happen between page load and onopen (use cursor)
+sync() fails on large amounts of posts
+duplicate tokens are being created, probably because duplicate MainPage is called before OpenPage
 call should have a special tone
 logoff should close token
 time out all requests and verify that sent posts are recieved
 don't update lastonline in resolvestragglers
 clean up long message sending
-sometimes long messsages have partial percent-escapes only in deployed version
-store icon binary in javascript
 
 PRIORITY 1: IMPORTANT
+store icon binary in javascript
 color code names
 dot points/numbered points
 clicking on a name should do something, maybe call?

@@ -332,7 +332,8 @@ if(gadget){
 }
 var verbose = true;//this specifies whether the header and footer are shown
 var currPostID = 0;
-var querycursor = '{{ querycursor }}';
+var endquerycursor = '{{ endquerycursor }}';
+var startquerycursor = '{{ startquerycursor }}';
 var disableSend = false
 var windowFocus = true;
 var mute = false;
@@ -404,7 +405,7 @@ function sendMessage(path, opt){
 		}
 		if(path.length > 2018){
 			//this seems to be the limit to send in a single post
-			excess = path.length - 2018;//2026 seems to be the limit but it causes some bug with percent-escapes, 2018 seems to work but I don't actually understand the bug
+			excess = path.length - 2018;//2048 character limit for queries, this seems to be the practical limit
 			return false;
 		}
 		var xhr = new XMLHttpRequest();
@@ -424,6 +425,7 @@ function sendMessage(path, opt){
 //on establishing a connection
 function onOpen(){
 	sendMessage('/opened');
+	sync();
 }
 
 function allowSend(allow){
@@ -431,22 +433,29 @@ function allowSend(allow){
 	document.getElementById('postbutton').disabled = !allow;
 }
 
+//var badChannelTimeout;
 //when the connection expires
 function onClose(){
 	socket.onclose = function(){};
 	socket.onerror = function(){};
 	socket.close();
 	var callback = function(response){
-		var arr =response.split("@@")
+		if(!response){
+			displayNote("Connection error. Please reload SavvyChat.");
+			sendMessage('/closed');
+			return
+		}
+		var arr = response.split("@@")
 		tokenid = arr.shift();
 		token = arr.join("@@");
 		openChannel();
 		allowSend(true);
 	};
 	sendMessage('/token',{callback:callback});
+	//badChannelTimeout = setTimeout(function(){
+		//displayNote("Session expired or failed. Savvychat will attempt to aquire a new connection, but possibly you may need to refresh the page.");});
 	//sendMessage('/closed');
 	allowSend(false);
-	displayNote("Session expired or failed. Savvychat will attempt to aquire a new connection, but possibly you may need to refresh the page.");
 	//alert("SavvyChat session expired or broke.");
 }
 
@@ -519,6 +528,10 @@ var alerted = false;
 function onMessage(message){
 	var m = JSON.parse(message.data);
 	if(m.content){
+		if(syncing){
+			syncInterrupt = true;
+			return;
+		}
 		//this was a post
 		recievePost(m);
 		//play a special tone when someone calls you, no matter what
@@ -538,11 +551,15 @@ function onMessage(message){
 		}
 		return;
 	}
+	/*if(m.verify){
+		//this was a verification
+		clearTimeout(badChannelTimeout);
+	}*/
 	/*if(m.posts){
 		//this was an archive retrieval
 		document.getElementById("viewarchivetag").innerHTML='<a href="" onclick="retrieveArchive();return false;">^ view older ^</a>'
 		recieveArchive(m.posts);
-		querycursor = m.cursor;
+		endquerycursor = m.cursor;
 		if(!m.showarchive){
 			document.getElementById("viewarchivetag").style.display = "None"
 		}
@@ -600,6 +617,16 @@ function sendPost(){
 			mathpreview = !mathpreview;
 			return;
 			break;
+		case "archive":
+			//retrieve archive
+			retrieveArchive();
+			return;
+			break;
+		case "sync":
+			//sync
+			sync();
+			return;
+			break;
 		}
 	}
 	
@@ -612,17 +639,16 @@ function sendPost(){
 	var enctext = encodeURIComponent(text);
 	if (sendMessage('/post', {param: 'p=' + enctext, callback: callback})){
 		//yay
-		//wait until we get a verify
 	}else{
 		if(meta != ""){
 			displayNote('Tagged message too long, was not sent. Remove "' + metahead + '" tag from your message or shorten it.');
 			return;
 		}
+		allowSend(false);
 		var partNo = 1;
 		var blockSize = enctext.length - excess; //i don't want to hardcode it in case i change something in sendMessage
 		processParts(partNo, blockSize, text, enctext)
 	}
-	allowSend(false);
 	document.getElementById("preview").innerHTML="";
 	document.getElementById("authorpreview").innerHTML = username+":";
 	document.getElementById("composefield").value="";
@@ -662,38 +688,85 @@ function processParts(partNo, blockSize, text, enctext){
 	var postcontent = meta + part
 	if(enctext == ""){
 		//done
-		callback = function(response){
-			allowSend(true);
-		};
+		allowSend(true);
+		callback = function(response){}
+		//callback = function(response){
+			//allowSend(true);
+		//};
 		postcontent = encodeURIComponent("|cont:" + (partNo-1) + ",0|") + part
 	}
 	sendMessage('/post', {param: 'p=' + postcontent, callback: callback});
 }
 
+var retrieving = true;
 //call the server for some archive
-function retrieveArchive(posts){
+function retrieveArchive(){
+	if(retrieving) return;
 	var callback = function(response){
 		var m = JSON.parse(response);
 		document.getElementById("viewarchivetag").innerHTML='<a href="" onclick="retrieveArchive();return false;">^ view older ^</a>'
+		showPreview();
 		recieveArchive(m.posts);
-		querycursor = m.cursor;
+		retrieving = false;
+		endquerycursor = m.cursor;
 		if(!m.showarchive){
 			document.getElementById("viewarchivetag").style.display = "None";
+			retrieving = true; //hacky way to disallow further retrieval
 		}
 	};
-	sendMessage('/retrieve', {param: 'c=' + encodeURIComponent(querycursor), callback: callback});
+	retrieving = true;
+	sendMessage('/retrieve', {param: 'c=' + encodeURIComponent(endquerycursor), callback: callback});
 	document.getElementById("viewarchivetag").innerHTML = "loading...";
 	//using AJAX for the reply seems marginally more reliable than COMET, but I'm not certain. Original COMET code is commented out in onMessage.
 }
 
+var syncInterrupt = false;
+var syncing = false
+//sync messages that may have not been recieved in COMET
+function sync(){
+	if(syncing) return;
+	var callback = function(response){
+		var m = JSON.parse(response);
+		startquerycursor = m.cursor;
+		recieveSync(m.posts);
+		syncing = false;
+		showPreview();
+		if(syncInterrupt){
+			sync();
+		}
+	};
+	sendMessage('/sync', {param: 'c=' + encodeURIComponent(startquerycursor), callback: callback});
+	syncing = true;
+	syncInterrupt = false;
+}
+
 //process the archive
 function recieveArchive(posts){
-	//i need a flag for whether to still show archive
 	//insert new posts
-	var postlist=document.getElementById("archivelist");
-	var interdiv=postlist.firstChild
+	//var postlist=document.getElementById("archivelist");
+	//var interdiv=postlist.firstChild;
 	for(var i=0;i<posts.length;i++){
 		recievePost(posts[i],true,true);
+	}
+	//if (interdiv.previousSibling.childNodes[1].innerHTML==interdiv.childNodes[1].innerHTML){
+		//interdiv.childNodes[1].style.display="None";
+	//}
+}
+
+//process the sync
+function recieveSync(posts){
+	//first, remove all unsynced posts
+	var postlist = document.getElementById("archivelist");
+	for (var postidx = postlist.childNodes.length - 1;postidx >= 0;postidx --){
+		var post = postlist.childNodes[postidx];
+		if(post.className && !hasClass(post,"synced")){
+			postlist.removeChild(post);
+		}
+	}
+	//insert new posts
+	//var interdiv = postlist.firstChild
+	for(var i=posts.length-2;i>=0;i--){
+		recievePost(posts[i]);
 	}
 	//if (interdiv.previousSibling.childNodes[1].innerHTML==interdiv.childNodes[1].innerHTML){
 		//interdiv.childNodes[1].style.display="None";
@@ -947,7 +1020,11 @@ function recievePost(post,ignoretopics,prepend){
 	}
 	newdiv.id = 'post' + currPostID;
 	newdiv.className = "post" + classtext;
-	var postlist=document.getElementById("archivelist");
+	if(syncing || !socket || retrieving){
+		//AJAX not comet, flag that
+		addClass(newdiv,"synced")
+	}
+	var postlist = document.getElementById("archivelist");
 	if(!prepend){
 		//append
 		//hide author label for repeated posts by the same author
@@ -955,8 +1032,8 @@ function recievePost(post,ignoretopics,prepend){
 			if(parsedObj.html != ""){
 				if(postlist.lastChild.childNodes[1].innerHTML == parsedObj.authortext){
 					newdiv.childNodes[1].style.display = "None";
-					newdiv.className += " joinedattop";
-					postlist.lastChild.className += " joinedatbottom";
+					addClass(newdiv,"joinedattop");
+					addClass(postlist.lastChild,"joinedatbottom");
 					//newdiv.style.marginTop = "0";
 					//newdiv.style.paddingTop = "0";
 					//postlist.lastChild.style.paddingBottom = "0";
@@ -972,8 +1049,8 @@ function recievePost(post,ignoretopics,prepend){
 			if(parsedObj.html != ""){
 				if(postlist.firstChild.childNodes[1].innerHTML == parsedObj.authortext){
 					postlist.firstChild.childNodes[1].style.display = "None";
-					postlist.firstChild.className += " joinedattop"
-					newdiv.className += " joinedatbottom";
+					addClass(newdiv,"joinedatbottom");
+					addClass(postlist.lastChild,"joinedattop");
 					//postlist.firstChild.style.marginTop = "0";
 					//postlist.firstChild.style.paddingTop = "0";
 					//newdiv.style.paddingBottom = "0";
@@ -1118,7 +1195,17 @@ function getHTMLfromSavvyCode(savvyCode, domath, author){
 			str = "enable"
 			if(mathpreview)str = "disable";
 			return {meta:'math',html:'<strong>Special command to '+str+' live previewing of math (will not send)</strong>', authortext:authortext};
-			break
+			break;
+		case "archive":
+			str = 'Special command to retrieve the last 10 posts in the archive';
+			if(retrieving)str = "Archive retrieval denied, command disabled";
+			return {meta:'archive',html:'<strong>'+str+' (will not send)</strong>', authortext:authortext};
+			break;
+		case "sync":
+			str = 'Special command to synchronize the discussion in case you failed to recieve some messages';
+			if(syncing)str = "Syncing in progress, command disabled";
+			return {meta:'sync',html:'<strong>'+str+' (will not send)</strong>', authortext:authortext};
+			break;
 		default:
 			return {meta:meta,html:'<strong>Unknown tag &quot;'+parts[0]+'&quot;</span></strong>', authortext:authortext};
 			break;
@@ -1531,6 +1618,7 @@ function goToView(dest) {
 		<div id="postlist" onscroll="setScrollLock();">
 			{% if showarchive %}
 			<div id="viewarchivetag" class="post" style="text-align:center;font-weight:bold;margin-top:0;"><a href="" onclick="retrieveArchive();return false;">^ view older ^</a></div>
+			<script type="text/javascript">retrieving = false;</script>
 			{% endif %}
 			<div id="archivelist"></div>
 			

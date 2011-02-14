@@ -149,7 +149,9 @@ class OpenedPage(webapp.RequestHandler):
 		chatuser.tokens = chatuser.tokens + [self.request.get('t')]
 		chatuser.lastrefreshlist = chatuser.lastrefreshlist + [datetime.utcnow()]
 		chatuser.put()
-
+		
+		#send a message so we can check whether the channel is truly open
+		#channel.send_message(chatuser.tokens, simplejson.dumps({'verify':0}))
 	
 class PostPage(webapp.RequestHandler):
 	def post(self):
@@ -218,6 +220,24 @@ class RetrievePage(webapp.RequestHandler):
 			querycursor = postsData.cursor() #but it's inefficient to keep overwriting the cursor...
 		#postList = postsData.fetch(EXTRAPOSTS)
 		message = simplejson.dumps({'posts':posts,'cursor':querycursor,'showarchive':showarchive})
+		self.response.out.write(message)
+		#channel.send_message(self.request.get('t'), message)
+
+class SyncPage(webapp.RequestHandler):
+	def post(self):
+		#there is a request for a sync since last time
+		endcursor = self.request.get('c')
+		if endcursor == "":
+			endcursor = None
+		postsData = db.GqlQuery("SELECT * FROM Post ORDER BY date DESC").with_cursor(end_cursor=endcursor) #not sure if i can omit start_cursor
+		posts = []
+		showarchive = False
+		startcursor = ""
+		for post in postsData:
+			if startcursor == "":
+				startcursor = startcursor = postsData.cursor()
+			posts = posts + [makePostObject(post)]
+		message = simplejson.dumps({'posts':posts,'cursor':startcursor})
 		self.response.out.write(message)
 		#channel.send_message(self.request.get('t'), message)
 		
@@ -311,9 +331,13 @@ class MainPage(webapp.RequestHandler):
 		#breakTime = False
 		#countdown = -1
 		showarchive = False
-		querycursor = ""
+		endquerycursor = ""
+		startquerycursor = ""
 		#the cursor saves the position in the query.
 		for post in postsData:
+			if startquerycursor == "":
+				#i wish i could initialize this outside the loop
+				startquerycursor = postsData.cursor()
 			showarchive = True
 			if len(posts) == MAXPOSTS:
 				#stop sending posts
@@ -326,7 +350,7 @@ class MainPage(webapp.RequestHandler):
 				else:
 					break
 			posts = posts + [makePostObject(post)]
-			querycursor = postsData.cursor() #but it's inefficient to keep overwriting the cursor...
+			endquerycursor = postsData.cursor() #but it's inefficient to keep overwriting the cursor...
 			showarchive = False
 				
 		#make token
@@ -373,7 +397,8 @@ class MainPage(webapp.RequestHandler):
 							'subtitle':subtitle,
 							'topic':topic,
 							'showarchive':showarchive,
-							'querycursor':querycursor,
+							'startquerycursor':startquerycursor,
+							'endquerycursor':endquerycursor,
 							'disableAlert':disableAlert,
 							'gadget':gadget,
 							'v':v,
@@ -387,6 +412,7 @@ application = webapp.WSGIApplication([
 									('/opened', OpenedPage),
 									('/post', PostPage),
 									('/retrieve', RetrievePage),
+									('/sync', SyncPage),
 									('/tone', TonePage),
 									('/token', TokenPage),
 									('/closed', ClosedPage)])
