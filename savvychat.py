@@ -250,7 +250,7 @@ class TokenPage(webapp.RequestHandler):
 		tokenindex = chatuser.tokens.index(self.request.get('t'))
 		del chatuser.tokens[tokenindex]
 		del chatuser.lastrefreshlist[tokenindex]
-		chatuser.put()
+
 		#get new token
 		suffix = 0
 		while 1:
@@ -259,6 +259,11 @@ class TokenPage(webapp.RequestHandler):
 				break
 			suffix = suffix + 1
 		token = channel.create_channel(tokenid)
+		
+		chatuser.tokens = chatuser.tokens + [tokenid]
+		chatuser.lastrefreshlist = chatuser.lastrefreshlist + [datetime.utcnow()]
+		chatuser.put()
+		
 		self.response.out.write(tokenid + '@@' + token)
 		
 class ClosedPage(webapp.RequestHandler):
@@ -321,7 +326,7 @@ class MainPage(webapp.RequestHandler):
 					chatuser.userid = userid
 					chatuser.name = name
 					chatuser.email = email
-					chatuser.put()
+					#chatuser.put()
 					chatuser.lastonline = datetime(2000,1,1) #so we load every message for them
 					break
 		
@@ -361,6 +366,11 @@ class MainPage(webapp.RequestHandler):
 				break
 			suffix = suffix + 1
 		token = channel.create_channel(tokenid)
+		
+		#the following would ideally be in openedpage, but it creates the possibility of duplicate tokens
+		chatuser.tokens = chatuser.tokens + [tokenid]
+		chatuser.lastrefreshlist = chatuser.lastrefreshlist + [datetime.utcnow()]
+		chatuser.put()
 		
 		#get subtitle
 		subtitleData = open("subtitles.txt")

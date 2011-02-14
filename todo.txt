@@ -1,7 +1,7 @@
 PRIORITY 0: DEFECTS
 I had an issue where the preview text was not inline with the authortext in the label
 limit topic length
-secure to prevent impersonation etc.
+secure each url to prevent impersonation etc.
 sync() fails on large amounts of posts
 duplicate tokens are being created, probably because duplicate MainPage is called before OpenPage
 call should have a special tone
@@ -9,6 +9,7 @@ logoff should close token
 time out all requests and verify that sent posts are recieved
 don't update lastonline in resolvestragglers
 clean up long message sending
+onbeforeunload not firing in gadget mode
 
 PRIORITY 1: IMPORTANT
 store icon binary in javascript
@@ -25,7 +26,6 @@ gmail gadget
 		fiddle with security settings
 	google accounts authentication
 		gadget double signin http://www.google.com/support/forum/p/apps-apis/thread?tid=42cc7b7de291bdd5&hl=en
-	onbeforeunload not firing
 	when open full view, disable the version of savvychat in the gadget
 		when it closes bring the gadget version back
 	when gadget is minimized, disable
