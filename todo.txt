@@ -2,21 +2,19 @@ PRIORITY 0: DEFECTS
 I had an issue where the preview text was not inline with the authortext in the label
 limit topic length
 secure each url to prevent impersonation etc.
-sync() fails on large amounts of posts
-duplicate tokens are being created, probably because duplicate MainPage is called before OpenPage
 call should have a special tone
 time out all requests and verify that sent posts are recieved
 clean up long message sending
 onbeforeunload not firing in gadget mode
 
 PRIORITY 1: IMPORTANT
+|archive might take arguments?
 store icon binary in javascript
 color code names
 dot points/numbered points
 clicking on a name should do something, maybe call?
 periodically send a refresher so resolvestragglers is more accurate than 2 hours
 |flushtokens
-|sync for when messages fail
 don't merge messages that have a really long gap
 gmail gadget
 	authentication with openID
@@ -32,6 +30,7 @@ x minutes ago/x seconds ago for dates
 format call emails a little better
 
 PRIORITY 2: COMPLICATED/UNIMPORTANT
+search archive
 |tag| is annoying to type
 press up in empty textbox to get last message
 dickson wants to be able to mess with the size of the post button and compose field

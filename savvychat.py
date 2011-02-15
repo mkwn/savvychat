@@ -144,6 +144,7 @@ def makePostObject(post):
 class OpenedPage(webapp.RequestHandler):
 	def post(self):
 		#called when a new connection is created
+		#THIS PAGE IS CURRENTLY UNUSED
 		chatuser = getUserFromId(self.request.get('u'))
 		#chatuser = Chatuser()
 		chatuser.tokens = chatuser.tokens + [self.request.get('t')]
@@ -236,8 +237,12 @@ class SyncPage(webapp.RequestHandler):
 		startcursor = ""
 		for post in postsData:
 			if startcursor == "":
-				startcursor = startcursor = postsData.cursor()
+				startcursor = postsData.cursor()
 			posts = posts + [makePostObject(post)]
+		if endcursor:
+			#endcursor should have been slightly earlier, chop off the last element
+			#this is inefficient
+			posts = posts[:-1]
 		message = simplejson.dumps({'posts':posts,'cursor':startcursor})
 		self.response.out.write(message)
 		#channel.send_message(self.request.get('t'), message)
@@ -261,6 +266,8 @@ class TokenPage(webapp.RequestHandler):
 			suffix = suffix + 1
 		token = channel.create_channel(tokenid)
 		
+		#the following would ideally be in openedpage, but it creates the possibility of duplicate tokens
+		#duplicate
 		chatuser.tokens = chatuser.tokens + [tokenid]
 		chatuser.lastrefreshlist = chatuser.lastrefreshlist + [datetime.utcnow()]
 		chatuser.lastonline = datetime.utcnow()

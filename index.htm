@@ -330,6 +330,10 @@ disableMath = true;
 if(gadget){
 	dopreview = false;
 }
+var denyretrieve = true;
+{% if showarchive %}
+denyretrieve = false;
+{% endif %}
 var verbose = true;//this specifies whether the header and footer are shown
 var currPostID = 0;
 var endquerycursor = '{{ endquerycursor }}';
@@ -408,6 +412,7 @@ function sendMessage(path, opt){
 			excess = path.length - 2018;//2048 character limit for queries, this seems to be the practical limit
 			return false;
 		}
+		//syncing=true;displayNote(path);syncing=false;
 		var xhr = new XMLHttpRequest();
 		xhr.open('POST', path, true);
 		xhr.send();
@@ -629,6 +634,7 @@ function sendPost(){
 			break;
 		case "sync":
 			//sync
+			//sendMessage("/test",{callback:function(response){displayNote(response);}})
 			sync();
 			return;
 			break;
@@ -703,10 +709,10 @@ function processParts(partNo, blockSize, text, enctext){
 	sendMessage('/post', {param: 'p=' + postcontent, callback: callback});
 }
 
-var retrieving = true;
+var retrieving = false;
 //call the server for some archive
 function retrieveArchive(){
-	if(retrieving) return;
+	if(retrieving||denyretrieve) return;
 	var callback = function(response){
 		var m = JSON.parse(response);
 		document.getElementById("viewarchivetag").innerHTML='<a href="" onclick="retrieveArchive();return false;">^ view older ^</a>'
@@ -716,7 +722,7 @@ function retrieveArchive(){
 		endquerycursor = m.cursor;
 		if(!m.showarchive){
 			document.getElementById("viewarchivetag").style.display = "None";
-			retrieving = true; //hacky way to disallow further retrieval
+			denyretrieve = true;
 		}
 	};
 	retrieving = true;
@@ -770,7 +776,7 @@ function recieveSync(posts){
 	}
 	//insert new posts
 	//var interdiv = postlist.firstChild
-	for(var i=posts.length-2;i>=0;i--){
+	for(var i=posts.length-1;i>=0;i--){
 		recievePost(posts[i]);
 	}
 	//if (interdiv.previousSibling.childNodes[1].innerHTML==interdiv.childNodes[1].innerHTML){
@@ -1203,7 +1209,7 @@ function getHTMLfromSavvyCode(savvyCode, domath, author){
 			break;
 		case "archive":
 			str = 'Special command to retrieve the last 10 posts in the archive';
-			if(retrieving)str = "Archive retrieval denied, command disabled";
+			if(retrieving||denyretrieve)str = "Archive retrieval denied, command disabled";
 			return {meta:'archive',html:'<strong>'+str+' (will not send)</strong>', authortext:authortext};
 			break;
 		case "sync":
@@ -1623,7 +1629,6 @@ function goToView(dest) {
 		<div id="postlist" onscroll="setScrollLock();">
 			{% if showarchive %}
 			<div id="viewarchivetag" class="post" style="text-align:center;font-weight:bold;margin-top:0;"><a href="" onclick="retrieveArchive();return false;">^ view older ^</a></div>
-			<script type="text/javascript">retrieving = false;</script>
 			{% endif %}
 			<div id="archivelist"></div>
 			
