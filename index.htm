@@ -566,6 +566,11 @@ function onMessage(message){
 	}*/
 }
 
+function logout(){
+	sendMessage('/closed');
+	location.href="{{ logouturl }}";
+}
+
 //send a new post to the server
 function sendPost(){
 	var text = document.getElementById("composefield").value.replace(/\r/g,"");
@@ -580,7 +585,7 @@ function sendPost(){
 		switch(metahead){
 		case "logout":
 			//logout
-			location.href="{{ logouturl }}";
+			logout();
 			return;
 			break;
 		case "hf":
@@ -1611,7 +1616,7 @@ function goToView(dest) {
 			<h1>SavvyChat <span class="sup" style="position:absolute;color:#999">beta</span></h1>
 			<div id="subtitle">{{ subtitle }}</div>
 			<div id="helpTag"><a onclick="return openHelp('');" href="help.htm">Help</a></div>
-			<div id="logoutTag"><a href="{{ logouturl }}">Logout</a></div>
+			<div id="logoutTag"><a onclick="logout();return false;" href="{{ logouturl }}">Logout</a></div>
 		</div>
 		<div id="archive">
 		<div onmouseover="marquee();" onmouseout="unmarquee();" id="topic">{{ topic }}</div>
@@ -1637,7 +1642,7 @@ function goToView(dest) {
 			</form>
 		</div>
 		<div id="footer">
-			SavvyChat was built with the <a href="http://code.google.com/appengine/">Google App Engine SDK</a> by <a href="mailto:fearthekwan@gmail.com">Matthew Kwan</a> for private use. Last update was on 2 Feb 2011.
+			SavvyChat was built with the <a href="http://code.google.com/appengine/">Google App Engine SDK</a> by <a href="mailto:fearthekwan@gmail.com">Matthew Kwan</a> for private use. Last update was on 15 Feb 2011.
 		</div>
 	</div>
 </div>

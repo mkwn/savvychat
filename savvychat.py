@@ -57,7 +57,7 @@ class Chatuser(db.Model):
 	tokens = db.StringListProperty()
 	lastrefreshlist = db.ListProperty(datetime)
 	playtone = db.BooleanProperty(default=False)
-	lastonline = db.DateTimeProperty(auto_now=True)
+	lastonline = db.DateTimeProperty()
 
 def fetchTokens():
 	#tokens = memcache.get("tokens")
@@ -148,6 +148,7 @@ class OpenedPage(webapp.RequestHandler):
 		#chatuser = Chatuser()
 		chatuser.tokens = chatuser.tokens + [self.request.get('t')]
 		chatuser.lastrefreshlist = chatuser.lastrefreshlist + [datetime.utcnow()]
+		chatuser.lastonline = datetime.utcnow()
 		chatuser.put()
 		
 		#send a message so we can check whether the channel is truly open
@@ -262,6 +263,7 @@ class TokenPage(webapp.RequestHandler):
 		
 		chatuser.tokens = chatuser.tokens + [tokenid]
 		chatuser.lastrefreshlist = chatuser.lastrefreshlist + [datetime.utcnow()]
+		chatuser.lastonline = datetime.utcnow()
 		chatuser.put()
 		
 		self.response.out.write(tokenid + '@@' + token)
@@ -274,6 +276,7 @@ class ClosedPage(webapp.RequestHandler):
 		tokenindex = chatuser.tokens.index(self.request.get('t'))
 		del chatuser.tokens[tokenindex]
 		del chatuser.lastrefreshlist[tokenindex]
+		chatuser.lastonline = datetime.utcnow()
 		chatuser.put()
 		
 class TonePage(webapp.RequestHandler):
@@ -286,6 +289,7 @@ class TonePage(webapp.RequestHandler):
 			chatuser.playtone = True
 		else:
 			chatuser.playtone = False
+		chatuser.lastonline = datetime.utcnow()
 		chatuser.put()
 		
 class MainPage(webapp.RequestHandler):
@@ -370,6 +374,7 @@ class MainPage(webapp.RequestHandler):
 		#the following would ideally be in openedpage, but it creates the possibility of duplicate tokens
 		chatuser.tokens = chatuser.tokens + [tokenid]
 		chatuser.lastrefreshlist = chatuser.lastrefreshlist + [datetime.utcnow()]
+		chatuser.lastonline = datetime.utcnow()
 		chatuser.put()
 		
 		#get subtitle

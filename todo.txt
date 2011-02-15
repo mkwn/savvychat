@@ -5,9 +5,7 @@ secure each url to prevent impersonation etc.
 sync() fails on large amounts of posts
 duplicate tokens are being created, probably because duplicate MainPage is called before OpenPage
 call should have a special tone
-logoff should close token
 time out all requests and verify that sent posts are recieved
-don't update lastonline in resolvestragglers
 clean up long message sending
 onbeforeunload not firing in gadget mode
 
