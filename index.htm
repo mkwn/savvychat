@@ -832,8 +832,7 @@ function hashstuff(text,codehash,mathhash,linkhashname,linkhashurl){
 	return output;
 }
 
-//append the textbox with a quote of another post
-function autoquote(content,author,date){
+function formatQuote(content){
 	var worktext = content.replace(/^\|\|[\s\S]*?\|\|/,"").replace(/\r/g,"");
 	if(/^\|+([^\|]+?)(\|+|$)([\s\S]*)/.test(worktext)){
 		//remove meta if necessary
@@ -869,7 +868,13 @@ function autoquote(content,author,date){
 	mathparts = output.split("$$");
 	output = interleave(mathparts, mathhash,'$$','$$','$$',' $$');
 	textarea = document.getElementById("composefield");
-	output = ">**" + author + " @ " + date + ":**\n" +output.replace(/\r/g,'');
+	return output.replace(/\r/g,'');
+}
+
+//append the textbox with a quote of another post
+function autoquote(content,author,date){
+	
+	output = ">**" + author + " @ " + date + ":**\n" + formatQuote(content);
 	if(textarea.value.replace(/\s/g,"") == ""){
 		textarea.value = output;
 	}else{
@@ -1282,7 +1287,7 @@ function addQuotes(savvyCode){
 	if(content.replace(/\r/g,"") == ""){
 		content="<br />";
 	}
-	return '\r<blockquote>'+content+'</blockquote>\r';
+	return '\r<blockquote>' + content + '</blockquote>\r';
 }
 
 //helper function that puts a hash back into the text
@@ -1291,10 +1296,10 @@ function interleave(parts, hash, startSepLine, endSepLine, startSepBlock, endSep
 	var progress="";
 	while(hash.length > 0){
 		progress+=parts.shift();
-		if(/[\r\n]/.test(progress.charAt(progress.length-1))&&/[\r\n]/.test(parts[0].charAt(0))){
-			progress+=startSepBlock+hash.shift()+endSepBlock;
+		if(/[\r\n]/.test(progress.charAt(progress.length-1)) && /[\r\n]/.test(parts[0].charAt(0))){
+			progress += startSepBlock+hash.shift() + endSepBlock;
 		}else{
-			progress+=startSepLine+hash.shift()+endSepLine;
+			progress += startSepLine+hash.shift() + endSepLine;
 		}
 	}
 	progress += parts[0];
@@ -1321,21 +1326,110 @@ function checkKeys(e){
 	if (e.keyCode) code = e.keyCode;
 	else code = e.which;
 	var character = String.fromCharCode(code).toLowerCase();
-	if(e.shiftKey&&code==13){
+	if(e.shiftKey && code == 13){
 		sendPost();
 		return stopBubble(e);
 	}
-	if(e.ctrlKey&&character=='i'){
+	if(e.ctrlKey && character == 'i'){
 		//italics
 		insertAroundCursor(document.getElementById('composefield'), "//");
 		return stopBubble(e);
 	}
-	if(e.ctrlKey&&character=='b'){
+	if(e.ctrlKey && character == 'b'){
 		//bold
 		insertAroundCursor(document.getElementById('composefield'), "**");
 		return stopBubble(e);
 	}
+	if(e.ctrlKey && character == 'q'){
+		//quote
+		quoteSelection(document.getElementById('composefield'))
+		//insertAroundCursor(document.getElementById('composefield'), "**");
+		return stopBubble(e);
+	}
 	return true;
+}
+
+function getSelectionPos(textarea){
+	var output = {startPos:0, endPos:0};
+	//IE support
+	//figuring out the cursor position is stupid in IE
+	if (document.selection) {
+		textarea.focus();
+		var sel = document.selection.createRange();
+		var oldvalue = textarea.value.replace(/\r\n/g,"\n");
+		var emptyflag = false
+		if(sel.text == ""){
+			emptyflag = true
+			sel.text = String.fromCharCode(123456);//i hope nobody actually types this in
+		}else{
+			//cache text then modify it so I can search for its position
+			if(sel.text.length == 1){
+				sel.text = String.fromCharCode(sel.text.charCodeAt(0) + 1);
+			}
+			sel.text = String.fromCharCode(sel.text.charCodeAt(0) + 1)
+			+ sel.text.substring(1, sel.text.length - 1)
+			+ String.fromCharCode(sel.text.charCodeAt(sel.text.length - 1) + 1);
+		}
+		var newvalue = textarea.value.replace(/\r\n/g,"\n");
+		for(var i = 0;i < oldvalue.length;i++){
+			if(oldvalue.charAt(i) != newvalue.charAt(i)){
+				output.startPos = i;
+				break;
+			}
+		}
+		if(emptyflag){
+			output.endPos = output.startPos
+		}else{
+			for(i = oldvalue.length-1;i >= 0;i--){
+				if(oldvalue.charAt(i) != newvalue.charAt(i)){
+					output.endPos = i + 1;
+					break;
+				}
+			}
+		}
+		textarea.value = oldvalue;
+	}
+	//MOZILLA/NETSCAPE support
+	else if (textarea.selectionStart || textarea.selectionStart == '0') {
+		output.startPos = textarea.selectionStart;
+		output.endPos = textarea.selectionEnd;
+	}
+	return output;
+}
+
+function setSelectionPos(textarea, startPos, endPos){
+	if(!endPos){
+		endPos = startPos;
+	}
+	//IE support
+	if (textarea.createTextRange) {
+		textarea.focus();
+		var sel = textarea.createTextRange()
+		//sel.moveStart('character', -textarea.value.length);
+		//sel.moveEnd('character', -textarea.value.length);
+		//sel.moveStart('character', startPos);
+		//sel.moveEnd('character', endPos);
+		sel.move("character",startPos);
+		sel.moveEnd('character', endPos - startPos);
+		sel.select()
+	}
+	//MOZILLA/NETSCAPE support
+	else if (textarea.selectionStart || textarea.selectionStart == '0') {
+		textarea.selectionStart = startPos;
+		textarea.selectionEnd = endPos;
+	}
+}
+
+function quoteSelection(textarea){
+	var selection = getSelectionPos(textarea);
+	textvalue = textarea.value.replace(/\r\n/g,"\n");
+	var pretext = textvalue.substring(0, selection.startPos);
+	if(pretext.length > 0 && pretext.charAt(pretext.length-1) != "\n") pretext += "\n";
+	var posttext = textvalue.substring(selection.endPos, textvalue.length);
+	if(posttext.length > 0 && posttext.charAt(0) != "\n") posttext = "\n" + posttext;
+	textarea.value = pretext + formatQuote(textvalue.substring(selection.startPos, selection.endPos)) + posttext;
+	if(selection.startPos == selection.endPos) setSelectionPos(textarea, pretext.length + 1);
+	else setSelectionPos(textarea, pretext.length, pretext.length + selection.endPos - selection.startPos + 1);
 }
 
 //put bold and italics tags around the cursor
@@ -1344,8 +1438,8 @@ function insertAroundCursor(textarea, tag) {
 	//IE support
 	if (document.selection) {
 		textarea.focus();
-		sel = document.selection.createRange();
-		if(sel.text==""){
+		var sel = document.selection.createRange();
+		if(sel.text == ""){
 			sel.text = tag;
 		}else{
 			sel.text = tag + sel.text + tag;
@@ -1357,10 +1451,12 @@ function insertAroundCursor(textarea, tag) {
 		var endPos = textarea.selectionEnd;
 		if(startPos == endPos){
 			textarea.value = textarea.value.substring(0, startPos) + tag + textarea.value.substring(endPos, textarea.value.length);
+			setSelectionPos(textarea, startPos + tag.length)
 		}else{
 			textarea.value = textarea.value.substring(0, startPos) + tag
 			+ textarea.value.substring(startPos, endPos) + tag
 			+ textarea.value.substring(endPos, textarea.value.length);
+			setSelectionPos(textarea, startPos, endPos + tag.length * 2);
 		}
 	}
 }

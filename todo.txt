@@ -1,4 +1,6 @@
 PRIORITY 0: DEFECTS
+http:// is seen as italics in autoquote
+i keep getting connection error instead of resent token
 I had an issue where the preview text was not inline with the authortext in the label
 limit topic length
 secure each url to prevent impersonation etc.
@@ -8,14 +10,12 @@ clean up long message sending
 onbeforeunload not firing in gadget mode
 
 PRIORITY 1: IMPORTANT
-|archive might take arguments?
 store icon binary in javascript
 color code names
 dot points/numbered points
+hidden blockquote for spoilers
 clicking on a name should do something, maybe call?
-periodically send a refresher so resolvestragglers is more accurate than 2 hours
 |flushtokens
-don't merge messages that have a really long gap
 gmail gadget
 	authentication with openID
 		seems necessary to open popup
@@ -28,21 +28,24 @@ gmail gadget
 	dynamic resizing with |+ and |-
 x minutes ago/x seconds ago for dates
 format call emails a little better
-
-PRIORITY 2: COMPLICATED/UNIMPORTANT
-search archive
-|tag| is annoying to type
 press up in empty textbox to get last message
-dickson wants to be able to mess with the size of the post button and compose field
-15 minute edit window
+
+PRIORITY 2: COMPLICATED
+allow to invite guest
+post color/display pictures - more easily identify poster
+search archive
+multiple threads
+edit/retract posts
+customize size/layout of elements
+	columns
 sending a mail to savvychat mailer forwards the mail to savvychat
 	escape backticks so can put email in code block
-post columns
 option to display online status
-app to cache/save messages
+iphone/android app
+	cache messages
 file/image upload
 image draw
-James wants a 'like' button
+"like" button
 some kind of private message system
 
 PRIORITY 3: OPTIMIZATIONS
@@ -53,8 +56,10 @@ use keys for chatusers instead of filtering and get()ing
 there is a dedicated emailproperty
 implement memcache for token list
 	implement memcache flush command
+maybe I should periodically send a refresher so resolvestragglers is more accurate than 2 hours
 	
 PRIORITY 4: NIGGLING THINGS
 tony had an issue where his tab font turned red occasionally
 mathjax is being strange with stuff that happens just as the page loads, empty $$$$ is a hacky fix
 stumbleupon and such break the window alignment
+|tag| is annoying to type
