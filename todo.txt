@@ -6,10 +6,8 @@ secure each url to prevent impersonation etc.
 time out all requests and verify that sent posts are recieved
 clean up long message sending
 onbeforeunload not firing in gadget mode
-resize oversized images
 
 PRIORITY 1: IMPORTANT
-links open new tab
 allow javascript: links without adding http://
 store icon binary in javascript
 color code names
@@ -59,6 +57,7 @@ implement memcache for token list
 	implement memcache flush command
 maybe I should periodically send a refresher so resolvestragglers is more accurate than 2 hours
 replace instances of charcodeAt()+1 with "\r" after stripping them
+have base.css and gadgets.css
 	
 PRIORITY 4: NIGGLING THINGS
 tony had an issue where his tab font turned red occasionally

@@ -1166,7 +1166,9 @@ function getHTMLfromSavvyCode(savvyCode, domath, author){
 			authortext = author + " changed topic: ";
 			break
 		case "img":
-			return {meta:'img',html:'<img onerror="setTimeout(&quot;scrollDown()&quot;,1);" onload="setTimeout(&quot;scrollDown()&quot;,1);" src="' + worktext.replace(/\n/g,"") + '" />', authortext:authortext};
+			var url = worktext.replace(/\n/g,"")
+			var onload = "setTimeout(&quot;scrollDown();ww=0;fitWindow();&quot;,1);"
+			return {meta:'img',html:'<br /><a target="_blank" href="' + url + '"><img onerror="' + onload + '" onload="' + onload + '" src="' + url + '" /></a>', authortext:authortext};
 			break;
 		case "me":
 			multiline = false;
@@ -1266,7 +1268,7 @@ function getHTMLfromSavvyCode(savvyCode, domath, author){
 	
 	//put back text part of links
 	linkparts = output.split("[[");
-	output = interleave(linkparts,linkhashname,'<a href="[[">','</a>','<a href="[[">','</a>');
+	output = interleave(linkparts,linkhashname,'<a target="_blank" href="[[">','</a>','<a target="_blank" href="[[">','</a>');
 
 	//put back links
 	linkparts = output.split("[[");
@@ -1566,6 +1568,18 @@ function fitWindow(){
 				document.getElementById('postbutton').style.width = "150px";
 				document.getElementById('previewchecklabel').innerHTML = "live preview&nbsp;&nbsp;";
 				document.getElementById('alertchecklabel').innerHTML = "play alert tone";
+			}
+		}
+		//refit images
+		var postlist = document.getElementById('postlist');
+		var images = document.getElementsByTagName('img');
+		for(var i = 0; i < images.length; i++){
+			images[i].style.width = "auto";
+			images[i].style.height = "auto";
+			var maxw = parseInt(postlist.style.width,10)-20;
+			if(images[i].offsetWidth > maxw){
+				images[i].style.width = maxw + "px";
+				images[i].style.height = images[i].offsetHeight * maxw / images[i].offsetWidth + "px";
 			}
 		}
 	}
