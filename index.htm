@@ -353,8 +353,8 @@ function addClass(ele,cls) {
 }
 function removeClass(ele,cls) {
 	if (hasClass(ele,cls)) {
-    	var reg = new RegExp('(\\s|^)'+cls+'(\\s|$)');
-		ele.className=ele.className.replace(reg,' ');
+    	var reg = new RegExp('(\\s|^)' + cls + '(\\s|$)');
+		ele.className = ele.className.replace(reg,' ');
 	}
 }
 
@@ -446,6 +446,11 @@ function onClose(){
 	socket.close();
 	var callback = function(response){
 		if(!response){
+			if(!windowFocus&&!alerted){
+				if(!disableAlert&&!mute){
+					playAlert("error");
+				}
+			}
 			displayNote("Connection error. Please reload SavvyChat.");
 			sendMessage('/closed');
 			return
@@ -469,16 +474,16 @@ function displayNote(text){
 	recievePost(post);
 }
 
-var snd;
-function playAlert(special){
+var sounds = {};
+function playAlert(type){
 	//play sound
 	if(typeof(Audio) == 'undefined'){
 		//this only works in IE
-		snd.src = "alert.wav";
+		document.all.IEsound.src = "sounds/"+type+".wav";
 	}else{
 		//HTML5 version
-		snd.play();
-		snd = new Audio("alert.wav");
+		sounds[type].play();
+		sounds[type] = new Audio("sounds/"+type+".wav");
 	}
 }
 
@@ -543,14 +548,14 @@ function onMessage(message){
 		//make function ifcalled(post)
 		if(gotCalled(m)&&!mute){
 			//play the tone
-			playAlert(true);
+			playAlert("call");
 		}
 		
 		if(!windowFocus&&!alerted){
 			setIcon("alert.ico");
 			document.title="* SavvyChat";
 			if(!disableAlert&&!gotCalled(m)&&!mute){
-				playAlert(false);
+				playAlert("alert");
 			}
 			alerted = true;
 		}
@@ -1527,41 +1532,41 @@ var wh = 0;
 //width and height are handled separately
 function fitWindow(){
 	var widthchanged = false;
-	if(ww!=windowWidth()){
+	if(ww != windowWidth()){
 		widthchanged = true;
-		ww=windowWidth();
-		if(ww>=900){
-			document.getElementById('content').style.width="900px";
-			document.getElementById('postlist').style.width="880px";
-			document.getElementById('composefield').style.width="880px";
-			document.getElementById('content').style.borderWidth=Math.min(Math.round((ww-900)/2),3)+"px";
+		ww = windowWidth();
+		if(ww >= 900){
+			document.getElementById('content').style.width = "900px";
+			document.getElementById('postlist').style.width = "880px";
+			document.getElementById('composefield').style.width = "880px";
+			document.getElementById('content').style.borderWidth = Math.min(Math.round((ww - 900)/2), 3) + "px";
 		}else{
-			padding=20;
+			padding = 20;
 			if(gadget){
-				padding=0;
+				padding = 0;
 			}
-			document.getElementById('postlist').style.width=ww-padding+"px";
-			document.getElementById('composefield').style.width=ww-padding+"px";
-			document.getElementById('content').style.borderWidth="0px";
-			document.getElementById('content').style.width=ww+"px";
-			if(ww<400){
-				document.getElementById('postbutton').value="Post";
-				document.getElementById('postbutton').style.width="60px";
-				document.getElementById('previewchecklabel').innerHTML="preview";
-				document.getElementById('alertchecklabel').innerHTML="tone";
+			document.getElementById('postlist').style.width = ww - padding + "px";
+			document.getElementById('composefield').style.width = ww - padding + "px";
+			document.getElementById('content').style.borderWidth = "0px";
+			document.getElementById('content').style.width = ww + "px";
+			if(ww < 400){
+				document.getElementById('postbutton').value = "Post";
+				document.getElementById('postbutton').style.width = "60px";
+				document.getElementById('previewchecklabel').innerHTML = "preview";
+				document.getElementById('alertchecklabel').innerHTML = "tone";
 				if(gadget){
-					document.getElementById('alertchecklabel').innerHTML="&#x266B;";
+					document.getElementById('alertchecklabel').innerHTML = "&#x266B;";
 				}
 			}else{
-				document.getElementById('postbutton').value="Post (Shift+Enter)";
-				document.getElementById('postbutton').style.width="150px";
-				document.getElementById('previewchecklabel').innerHTML="live preview&nbsp;&nbsp;";
-				document.getElementById('alertchecklabel').innerHTML="play alert tone";
+				document.getElementById('postbutton').value = "Post (Shift+Enter)";
+				document.getElementById('postbutton').style.width = "150px";
+				document.getElementById('previewchecklabel').innerHTML = "live preview&nbsp;&nbsp;";
+				document.getElementById('alertchecklabel').innerHTML = "play alert tone";
 			}
 		}
 	}
 	if(widthchanged || wh != windowHeight()){
-		wh=windowHeight();
+		wh = windowHeight();
 		var availablepx = wh;
 		if(ww < 900 || wh < 600 || !verbose){
 			document.getElementById('header').style.display = "None";
@@ -1628,10 +1633,11 @@ function onLoadBody(){
 	
 	//set up the infrastructure to play audio
 	if(typeof(Audio) == 'undefined'){
-		document.getElementById("dummy").innerHTML += '<bgsound id="IEsound" />'
-		snd = document.all.IEsound;
+		document.getElementById("dummy").innerHTML += '<bgsound id="IEsound" />';
 	}else{
-		snd = new Audio("alert.wav");
+		sounds["alert"] = new Audio("sounds/alert.wav");
+		sounds["error"] = new Audio("sounds/error.wav");
+		sounds["call"] = new Audio("sounds/call.wav");
 	}
 	
 	//parse topic

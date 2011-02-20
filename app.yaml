@@ -18,10 +18,9 @@ handlers:
 - url: /json2.js
   static_files: json2.js
   upload: json2.js
-  
-- url: /alert.wav
-  static_files: alert.wav
-  upload: alert.wav
+
+- url: /sounds
+  static_dir: sounds
   
 - url: /help.htm
   static_files: help.htm

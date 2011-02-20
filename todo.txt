@@ -4,12 +4,14 @@ i keep getting connection error instead of resent token
 I had an issue where the preview text was not inline with the authortext in the label
 limit topic length
 secure each url to prevent impersonation etc.
-call should have a special tone
 time out all requests and verify that sent posts are recieved
 clean up long message sending
 onbeforeunload not firing in gadget mode
+resize oversized images
 
 PRIORITY 1: IMPORTANT
+links open new tab
+allow javascript: links without adding http://
 store icon binary in javascript
 color code names
 dot points/numbered points
@@ -47,16 +49,17 @@ file/image upload
 image draw
 "like" button
 some kind of private message system
+different nicer skins
 
 PRIORITY 3: OPTIMIZATIONS
 probably dont need to send ?u
 maybe ?t should be optional
 math shouldnt need to rerender
 use keys for chatusers instead of filtering and get()ing
-there is a dedicated emailproperty
 implement memcache for token list
 	implement memcache flush command
 maybe I should periodically send a refresher so resolvestragglers is more accurate than 2 hours
+replace instances of charcodeAt()+1 with "\r" after stripping them
 	
 PRIORITY 4: NIGGLING THINGS
 tony had an issue where his tab font turned red occasionally
