@@ -844,6 +844,10 @@ function formatQuote(content){
 		worktext = RegExp.$3;
 	}
 	
+	//find something formatted like a link
+	worktext = "\r" + worktext + "\r";
+	worktext = worktext.replace(/(\s(&gt;)*)((ht|f)tp(s?)\:\/\/[\S]*)(\s)/g,"$1[[$3]]$6");
+	
 	//hash code and math
 	var codehash = [];
 	var mathhash = [];
@@ -853,15 +857,15 @@ function formatQuote(content){
 	var output = hashstuff(worktext,codehash,mathhash,linkhashname,linkhashurl)
 	
 	//add quote tags
-	output=">"+output.replace(/\n/g,"\n>");
+	output = ">" + output.replace(/\n/g,"\n>");
 	
 	//close open formatting tags
-	output=output.replace(/\*\*([\s\S]*?)$/,'**$1**');
-	output=output.replace(/\/\/([\s\S]*?)$/,'//$1//')
-	output=output.replace(/__([\s\S]*?)$/,'__$1__');
+	output = output.replace(/\*\*([\s\S]*?)$/,'**$1**');
+	output = output.replace(/\/\/([\s\S]*?)$/,'//$1//')
+	output = output.replace(/__([\s\S]*?)$/,'__$1__');
 	
 	//put back code
-	codeparts=output.split("`");
+	codeparts = output.split("`");
 	output = interleave(codeparts,codehash,'`','`','`','`')
 	//put back text part of links
 	linkparts = output.split("[[");
@@ -1234,8 +1238,8 @@ function getHTMLfromSavvyCode(savvyCode, domath, author){
 	}
 	if(worktext == "") worktext = " ";
 	//find something formatted like a link
-	worktext="\r"+worktext+"\r";
-	worktext=worktext.replace(/([\s&gt;])((ht|f)tp(s?)\:\/\/[\S]*)(\s)/g,"$1[[$2]]$5")
+	worktext = "\r" + worktext + "\r";
+	worktext = worktext.replace(/(\s(&gt;)*)((ht|f)tp(s?)\:\/\/[\S]*)(\s)/g,"$1[[$3]]$6");
 	
 	//hash code and math so we can do formatting on the rest
 	var codehash = [];
@@ -1245,18 +1249,18 @@ function getHTMLfromSavvyCode(savvyCode, domath, author){
 	var output = hashstuff(worktext,codehash,mathhash,linkhashname,linkhashurl)
 	
 	//do formatting
-	output=output.replace(/\*\*([\s\S]*?)\*\*/g,'<strong>$1</strong>').replace(/\*\*([\s\S]*?)$/,'<strong>$1</strong>');
-	output=output.replace(/\/\/([\s\S]*?)\/\//g,'<em>$1</em>').replace(/\/\/([\s\S]*?)$/,'<em>$1</em>')
-	output=output.replace(/__([\s\S]*?)__/g,'<span class="strikethrough">$1</span>').replace(/__([\s\S]*?)$/,'<span class="strikethrough">$1</span>');
+	output = output.replace(/\*\*([\s\S]*?)\*\*/g,'<strong>$1</strong>').replace(/\*\*([\s\S]*?)$/,'<strong>$1</strong>');
+	output = output.replace(/\/\/([\s\S]*?)\/\//g,'<em>$1</em>').replace(/\/\/([\s\S]*?)$/,'<em>$1</em>')
+	output = output.replace(/__([\s\S]*?)__/g,'<span class="strikethrough">$1</span>').replace(/__([\s\S]*?)$/,'<span class="strikethrough">$1</span>');
 	
 	if(multiline){
 		//add quotes
-		output="\r"+output+"\r";
-		output=output.replace(/([\r\n]&gt;.*?)+[\r\n]/g,addQuotes);
+		output = "\r" + output + "\r";
+		output = output.replace(/([\r\n]&gt;.*?)+[\r\n]/g,addQuotes);
 	}
 	
 	//put back code
-	if(multiline) output="\r"+output+"\r";
+	if(multiline) output = "\r" + output + "\r";
 	codeparts = output.split("`");
 	output = interleave(codeparts,codehash,'<span class="code">','</span>','<pre class="code">','</pre>');
 	
@@ -1269,8 +1273,8 @@ function getHTMLfromSavvyCode(savvyCode, domath, author){
 	output = interleave(linkparts,linkhashurl,'','','','');
 	
 	//put back math
-	if(multiline) output="\r"+output+"\r";
-	mathparts=output.split("$$");
+	if(multiline) output = "\r" + output + "\r";
+	mathparts = output.split("$$");
 	if(domath){
 		output = interleave(mathparts, mathhash,'\\(','\\)','$$',' $$');
 	}else{
@@ -1278,7 +1282,7 @@ function getHTMLfromSavvyCode(savvyCode, domath, author){
 	}
 	
 	//add newlines
-	output=output.replace(/\r/g,'').replace(/\n/g,'<br />');
+	output = output.replace(/\r/g,'').replace(/\n/g,'<br />');
 	if(metahead == "me"){
 		if(output.substr(0,1) != " ") output = " " + output;
 		return {meta:meta,html:"",authortext:author + output};
@@ -1290,7 +1294,7 @@ function getHTMLfromSavvyCode(savvyCode, domath, author){
 function addQuotes(savvyCode){
 	var content = savvyCode.replace(/([\n\r])&gt;/g,"$1").replace(/^\n|\n$/g,'').replace(/([\r\n]&gt;.*?)+[\r\n]/g,addQuotes);
 	if(content.replace(/\r/g,"") == ""){
-		content="<br />";
+		content = "<br />";
 	}
 	return '\r<blockquote>' + content + '</blockquote>\r';
 }
@@ -1298,9 +1302,9 @@ function addQuotes(savvyCode){
 //helper function that puts a hash back into the text
 //has is tagged according to whether the code/math is isolated in a paragraph
 function interleave(parts, hash, startSepLine, endSepLine, startSepBlock, endSepBlock){
-	var progress="";
+	var progress = "";
 	while(hash.length > 0){
-		progress+=parts.shift();
+		progress += parts.shift();
 		if(/[\r\n]/.test(progress.charAt(progress.length-1)) && /[\r\n]/.test(parts[0].charAt(0))){
 			progress += startSepBlock+hash.shift() + endSepBlock;
 		}else{
@@ -1749,7 +1753,7 @@ function goToView(dest) {
 			</form>
 		</div>
 		<div id="footer">
-			SavvyChat was built with the <a href="http://code.google.com/appengine/">Google App Engine SDK</a> by <a href="mailto:fearthekwan@gmail.com">Matthew Kwan</a> for private use. Last update was on 15 Feb 2011.
+			SavvyChat was built with the <a href="http://code.google.com/appengine/">Google App Engine SDK</a> by <a href="mailto:fearthekwan@gmail.com">Matthew Kwan</a> for private use. Last update was on 20 Feb 2011.
 		</div>
 	</div>
 </div>

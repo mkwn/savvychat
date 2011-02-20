@@ -1,5 +1,4 @@
 PRIORITY 0: DEFECTS
-http:// is seen as italics in autoquote
 i keep getting connection error instead of resent token
 I had an issue where the preview text was not inline with the authortext in the label
 limit topic length
