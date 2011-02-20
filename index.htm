@@ -451,7 +451,7 @@ function onClose(){
 					playAlert("error");
 				}
 			}
-			displayNote("Connection error. Please reload SavvyChat.");
+			displayNote("Connection error. Please [[reload SavvyChat@@javascript:location.reload();]].");
 			sendMessage('/closed');
 			return
 		}
@@ -822,7 +822,7 @@ function hashstuff(text,codehash,mathhash,linkhashname,linkhashurl){
 				linkdata.unshift(linkdata[0]);
 			}
 			//If the url is not prefixed with a protocol, add one
-			if(!/^(ht|f)tp(s?)\:\/\//.test(linkdata[1])){
+			if(!/^(ht|f)tp(s?)\:\/\/|^javascript:/.test(linkdata[1])){
 				linkdata[1] = "http://"+linkdata[1];
 			}
 			linkhashurl.push(linkdata[1].replace(/\s/g,""));
@@ -1717,8 +1717,8 @@ function goToView(dest) {
 </script>
 {% if gadget %}
 <!--I copied the following from the twitter gadget, got no idea what it does-->
-<script src='http://www.gmodules.com/gadgets/js/{{ libs }}?v={{ v }}&container={{ container }}&debug=0'></script>
-<script>gadgets.config.init({"rpc":{"useLegacyProtocol":false,"parentRelayUrl":"/rpc_relay.html"},"views":{"profile":{"aliases":["DASHBOARD","default"],"isOnlyVisible":false,"urlTemplate":"http://localhost/gadgets/profile?{var}"},"canvas":{"aliases":["FULL_PAGE"],"isOnlyVisible":true,"urlTemplate":"http://localhost/gadgets/canvas?{var}"}},"core.util":{"flash":{},"dynamic-height":{},"views":{},"setprefs":{},"maximize":{},"opensocial-0.8":{},"tabs":{}},"core.io":{"proxyUrl":"http://www.gmodules.com/gadgets/proxy/refresh=%refresh%&container=%container%&gadget=%gadget%/%url%","jsonProxyUrl":"http://%host%/gadgets/makeRequest"},"opensocial-0.8":{"domain":"google.com","path":"http://%host%/api","supportedFields":{"person":["id","name","thumbnailUrl","nickname"],"filterType":["all","hasApp"],"activity":["id","externalId","userId","appId","streamTitle","streamUrl","streamSourceUrl","streamFaviconUrl","title","body","url","mediaItems","postedTime"],"activityMediaItem":["type","mimeType","url"],"sortOrder":["name"],"name":["unstructured","familyName","givenName","additionalName","honorificPrefix, honorificSuffix"]},"impl":"rpc","enableCaja":false}});</script>
+<script type="text/javascript" src='http://www.gmodules.com/gadgets/js/{{ libs }}?v={{ v }}&container={{ container }}&debug=0'></script>
+<script type="text/javascript">gadgets.config.init({"rpc":{"useLegacyProtocol":false,"parentRelayUrl":"/rpc_relay.html"},"views":{"profile":{"aliases":["DASHBOARD","default"],"isOnlyVisible":false,"urlTemplate":"http://localhost/gadgets/profile?{var}"},"canvas":{"aliases":["FULL_PAGE"],"isOnlyVisible":true,"urlTemplate":"http://localhost/gadgets/canvas?{var}"}},"core.util":{"flash":{},"dynamic-height":{},"views":{},"setprefs":{},"maximize":{},"opensocial-0.8":{},"tabs":{}},"core.io":{"proxyUrl":"http://www.gmodules.com/gadgets/proxy/refresh=%refresh%&container=%container%&gadget=%gadget%/%url%","jsonProxyUrl":"http://%host%/gadgets/makeRequest"},"opensocial-0.8":{"domain":"google.com","path":"http://%host%/api","supportedFields":{"person":["id","name","thumbnailUrl","nickname"],"filterType":["all","hasApp"],"activity":["id","externalId","userId","appId","streamTitle","streamUrl","streamSourceUrl","streamFaviconUrl","title","body","url","mediaItems","postedTime"],"activityMediaItem":["type","mimeType","url"],"sortOrder":["name"],"name":["unstructured","familyName","givenName","additionalName","honorificPrefix, honorificSuffix"]},"impl":"rpc","enableCaja":false}});</script>
 {% endif %}
 <title>SavvyChat</title>
 </head>

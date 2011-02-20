@@ -8,7 +8,7 @@ clean up long message sending
 onbeforeunload not firing in gadget mode
 
 PRIORITY 1: IMPORTANT
-allow javascript: links without adding http://
+give some context instead of only showing unread
 store icon binary in javascript
 color code names
 dot points/numbered points
