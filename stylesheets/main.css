@@ -7,6 +7,10 @@ a{
 text-decoration: none;
 }
 
+a img{
+border-style: none;
+}
+
 .code{
 font-family: Courier New, monospace;
 background-color: #EEE;
