@@ -3,18 +3,16 @@ i keep getting connection error instead of resent token
 I had an issue where the preview text was not inline with the authortext in the label
 limit topic length
 secure each url to prevent impersonation etc.
-time out all requests and verify that sent posts are recieved
+time out all requests
 clean up long message sending
 onbeforeunload not firing in gadget mode
 queue posts with verify
 
 PRIORITY 1: IMPORTANT
-autoquote to cursor position
-favicon change and star for error
+nested dot points
 give some context instead of only showing unread
-store icon binary in javascript
+store icon binary in javascript http://userscripts.org/scripts/review/24430
 color code names
-dot points/numbered points
 hidden blockquote for spoilers
 clicking on a name should do something, maybe call?
 |flushtokens

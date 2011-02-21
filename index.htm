@@ -888,7 +888,7 @@ function autoquote(content,author,date){
 	output = ">**" + author + " @ " + date + ":**\n" + formatQuote(content);
 	
 	var textarea = document.getElementById("composefield");
-	var textvalue = textarea.value.replace(/\r\n/,"\n");
+	var textvalue = textarea.value.replace(/\r\n/g,"\n");
 	var selection = getSelectionPos(textarea);
 	var pretext = textvalue.substr(0,selection.startPos)
 	var posttext = textvalue.substr(selection.endPos)
@@ -1267,7 +1267,12 @@ function getHTMLfromSavvyCode(savvyCode, domath, author){
 	output = output.replace(/\/\/([\s\S]*?)\/\//g,'<em>$1</em>').replace(/\/\/([\s\S]*?)$/,'<em>$1</em>')
 	output = output.replace(/__([\s\S]*?)__/g,'<span class="strikethrough">$1</span>').replace(/__([\s\S]*?)$/,'<span class="strikethrough">$1</span>');
 	
+	
 	if(multiline){
+		//add dot points
+		output = "\r" + output + "\r";
+		output = output.replace(/([\r\n]- .*?)+[\r\n]/g,addDotPoints);
+		
 		//add quotes
 		output = "\r" + output + "\r";
 		output = output.replace(/([\r\n]&gt;.*?)+[\r\n]/g,addQuotes);
@@ -1311,6 +1316,10 @@ function addQuotes(savvyCode){
 		content = "<br />";
 	}
 	return '\r<blockquote>' + content + '</blockquote>\r';
+}
+
+function addDotPoints(savvyCode){
+	return "<ul>" + savvyCode.replace(/[\r\n]/g,"\r\r").replace(/\r- (.*?)\r/g,"<li>$1</li>") + "</ul>"
 }
 
 //helper function that puts a hash back into the text
