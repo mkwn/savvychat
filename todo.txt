@@ -6,8 +6,11 @@ secure each url to prevent impersonation etc.
 time out all requests and verify that sent posts are recieved
 clean up long message sending
 onbeforeunload not firing in gadget mode
+queue posts with verify
 
 PRIORITY 1: IMPORTANT
+autoquote to cursor position
+favicon change and star for error
 give some context instead of only showing unread
 store icon binary in javascript
 color code names

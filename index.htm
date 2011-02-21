@@ -9,7 +9,7 @@
 <style type="text/css">
 body{
 overflow: hidden;
-margin: 0;
+margin: 0 !important;
 }
 h1,h2,h3,h4{
 margin-top: 0;
@@ -75,8 +75,8 @@ text-align: center;
 }
 #loadingContent{
 text-align: center;
-margin-left: auto ;
-margin-right: auto ;
+margin-left: auto;
+margin-right: auto;
 width: 150px;
 background-color: #FFF;
 border: solid;
@@ -451,9 +451,12 @@ function onClose(){
 					playAlert("error");
 				}
 			}
+			setIcon("error.ico");
+			document.title = "! SavvyChat";
+			alerted = false;
 			displayNote("Connection error. Please [[reload SavvyChat@@javascript:location.reload();]].");
 			sendMessage('/closed');
-			return
+			return;
 		}
 		var arr = response.split("@@")
 		tokenid = arr.shift();
@@ -876,19 +879,28 @@ function formatQuote(content){
 	//put back math
 	mathparts = output.split("$$");
 	output = interleave(mathparts, mathhash,'$$','$$','$$',' $$');
-	textarea = document.getElementById("composefield");
+	var textarea = document.getElementById("composefield");
 	return output.replace(/\r/g,'');
 }
 
 //append the textbox with a quote of another post
 function autoquote(content,author,date){
-	
 	output = ">**" + author + " @ " + date + ":**\n" + formatQuote(content);
-	if(textarea.value.replace(/\s/g,"") == ""){
+	
+	var textarea = document.getElementById("composefield");
+	var textvalue = textarea.value.replace(/\r\n/,"\n");
+	var selection = getSelectionPos(textarea);
+	var pretext = textvalue.substr(0,selection.startPos)
+	var posttext = textvalue.substr(selection.endPos)
+	if(pretext.length != 0 && pretext.charAt(pretext.length-1) != "\n") pretext += "\n";
+	if(posttext.length != 0 && posttext.charAt(0) != "\n") posttext = "\n" + posttext;
+	textarea.value = pretext + output + posttext;
+	setSelectionPos(textarea, pretext.length, pretext.length + output.length);
+	/*if(textarea.value.replace(/\s/g,"") == ""){
 		textarea.value = output;
 	}else{
-		textarea.value += "\n\n" + output;
-	}
+		textarea.value += "\n" + output;
+	}*/
 	showPreview();
 }
 
@@ -1767,7 +1779,7 @@ function goToView(dest) {
 			</form>
 		</div>
 		<div id="footer">
-			SavvyChat was built with the <a href="http://code.google.com/appengine/">Google App Engine SDK</a> by <a href="mailto:fearthekwan@gmail.com">Matthew Kwan</a> for private use. Last update was on 20 Feb 2011.
+			SavvyChat was built with the <a href="http://code.google.com/appengine/">Google App Engine SDK</a> by <a href="mailto:fearthekwan@gmail.com">Matthew Kwan</a> for private use. Last update was on 21 Feb 2011.
 		</div>
 	</div>
 </div>
