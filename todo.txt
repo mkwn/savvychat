@@ -9,6 +9,8 @@ onbeforeunload not firing in gadget mode
 queue posts with verify
 
 PRIORITY 1: IMPORTANT
+call showpreview only if changed
+in preview, spoilers should be open by default/keep opened mode
 nested dot points
 give some context instead of only showing unread
 store icon binary in javascript http://userscripts.org/scripts/review/24430

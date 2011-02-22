@@ -7,13 +7,8 @@ handlers:
 - url: /stylesheets
   static_dir: stylesheets
 
-- url: /favicon.ico
-  static_files: favicon.ico
-  upload: favicon.ico
-
-- url: /alert.ico
-  static_files: alert.ico
-  upload: alert.ico
+- url: /icons
+  static_dir: icons
 
 - url: /json2.js
   static_files: json2.js

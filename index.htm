@@ -56,7 +56,7 @@ border: solid;
 border-left: none;
 border-right: none;
 border-color: #EEE;
-border-width: 2px;
+border-width: 3px;
 margin-left: 20px;
 margin-right: 20px;
 }
@@ -499,7 +499,7 @@ function newIconLink(path,id,rel){
 	newIcon.rel = rel;
 	newIcon.id = id;
 	newIcon.type = "image/x-icon";
-	newIcon.href = path;
+	newIcon.href = "icons/" + path;
 	head.appendChild(newIcon);
 }
 
@@ -1319,7 +1319,7 @@ function addQuotes(savvyCode){
 	if(/^[\r\n]*&lt; *.*?[\n\r]/.test(content)){
 		content = content.replace(/^[\r\n]*&lt; *(.*?)[\n\r]/,"")
 		//this is a spoiler
-		return '\r<blockquote><a onclick="this.nextSibling.style.display=this.nextSibling.style.display==&quot;none&quot;?&quot;Block&quot;:&quot;None&quot;;return false;" href="">Show/Hide ' + RegExp.$1 + '</a><div>' + content + '</div></blockquote>\r';
+		return '\r<blockquote><a onclick="if(this.nextSibling.style.display==&quot;none&quot;){this.nextSibling.style.display=&quot;block&quot;;scrollDown();}else{this.nextSibling.style.display=&quot;none&quot;}return false;" href="">Show/Hide ' + RegExp.$1 + '</a><div style="display:none;">' + content + '</div></blockquote>\r';
 	}
 	return '\r<blockquote>\r' + content + '\r</blockquote>\r';
 }
