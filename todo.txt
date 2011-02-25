@@ -1,4 +1,5 @@
 PRIORITY 0: DEFECTS
+queue posts with verify
 i keep getting connection error instead of resent token
 I had an issue where the preview text was not inline with the authortext in the label
 limit topic length
@@ -6,9 +7,10 @@ secure each url to prevent impersonation etc.
 time out all requests
 clean up long message sending
 onbeforeunload not firing in gadget mode
-queue posts with verify
 
 PRIORITY 1: IMPORTANT
+|status with average latency and connection expiry
+autoparse parentheses like (http://a)
 call showpreview only if changed
 in preview, spoilers should be open by default/keep opened mode
 nested dot points

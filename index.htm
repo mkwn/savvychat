@@ -403,13 +403,8 @@ function openChannel(){
 var excess = 0;
 //send any message to server
 function sendMessage(path, opt){
-		path += '?u='+ userid+'&t='+tokenid;
-		if (opt && opt.param){
-			path += '&' + opt.param;
-		}
-		if(path.length > 2018){
-			//this seems to be the limit to send in a single post
-			excess = path.length - 2018;//2048 character limit for queries, this seems to be the practical limit
+		path = validateMessage(path, opt);
+		if(!path){
 			return false;
 		}
 		//syncing=true;displayNote(path);syncing=false;
@@ -425,6 +420,20 @@ function sendMessage(path, opt){
 			}
 		};
 		return xhr;
+}
+
+//check the message is not too long
+function validateMessage(path, opt){
+		//path += '?u='+ userid+'&t='+tokenid;
+		if (opt && opt.param){
+			path += '?' + opt.param;
+		}
+		if(path.length > 2018){
+			//this seems to be the limit to send in a single post
+			excess = path.length - 2018;//2048 character limit for queries, this seems to be the practical limit
+			return false;
+		}
+		return path;
 }
 
 //on establishing a connection
@@ -455,7 +464,7 @@ function onClose(){
 			document.title = "! SavvyChat";
 			alerted = false;
 			displayNote("Connection error. Please [[reload SavvyChat@@javascript:location.reload();]].");
-			sendMessage('/closed');
+			sendMessage('/closed', {param: 'u=' + userid + '&t=' + tokenid});
 			return;
 		}
 		var arr = response.split("@@")
@@ -464,7 +473,7 @@ function onClose(){
 		openChannel();
 		allowSend(true);
 	};
-	sendMessage('/token',{callback:callback});
+	sendMessage('/token',{callback:callback, param: 't=' + tokenid});
 	//badChannelTimeout = setTimeout(function(){
 		//displayNote("Session expired or failed. Savvychat will attempt to aquire a new connection, but possibly you may need to refresh the page.");});
 	//sendMessage('/closed');
@@ -515,6 +524,8 @@ function setIcon(path){
 	if(version<9){
 		return;
 	}
+	
+	if(!path) path = "favicon.ico";
 	
 	newIconLink(path,"icon","icon");
 	newIconLink(path,"sicon","shortcut icon");
@@ -580,8 +591,11 @@ function onMessage(message){
 }
 
 function logout(){
-	sendMessage('/closed');
+	sendMessage('/closed', {param: 'u=' + userid + '&t=' + tokenid});
 	location.href="{{ logouturl }}";
+}
+
+function queuePost(){
 }
 
 //send a new post to the server
@@ -653,11 +667,27 @@ function sendPost(){
 	
 	if(text == "") return;
 	var callback = function(response){
-		allowSend(true);
+		//i should actually queue here
+		//allowSend(true);
 	};
 	var enctext = encodeURIComponent(text);
+	
+	if(metahead == "call"){
+		var enchtml = encodeURIComponent(getHTMLfromSavvyCode(text, false, username, true).html);
+		var encrec = encodeURIComponent(meta.replace(/^.*?\:|.*/,""));
+		if(encrec == "") encrec = "all";
+		if (!validateMessage('/call', {param: 'h=' + enchtml + '&r=' + encrec})){
+			displayNote('Tagged message too long, was not sent. Remove "' + metahead + '" tag from your message or shorten it.');
+			return;
+		}
+	}
+	
 	if (sendMessage('/post', {param: 'p=' + enctext, callback: callback})){
 		//yay
+		if(metahead == "call"){
+			//send html version for email
+			sendMessage('/call', {param: 'h=' + enchtml + '&r=' + encrec});
+		}
 	}else{
 		if(meta != ""){
 			displayNote('Tagged message too long, was not sent. Remove "' + metahead + '" tag from your message or shorten it.');
@@ -668,9 +698,9 @@ function sendPost(){
 		var blockSize = enctext.length - excess; //i don't want to hardcode it in case i change something in sendMessage
 		processParts(partNo, blockSize, text, enctext)
 	}
-	document.getElementById("preview").innerHTML="";
-	document.getElementById("authorpreview").innerHTML = username+":";
-	document.getElementById("composefield").value="";
+	document.getElementById("preview").innerHTML = "";
+	document.getElementById("authorpreview").innerHTML = username + ":";
+	document.getElementById("composefield").value = "";
 	//recievePost({content:document.getElementById("composefield").value,author:username,date:"1/3/11, 13:30 EST"});
 }
 
@@ -795,7 +825,7 @@ function recieveSync(posts){
 //helper function since we require to hash the 3 different escaping tags in both autoquote() and getHTMLfromSavvyCode()
 function hashstuff(text,codehash,mathhash,linkhashname,linkhashurl){
 	var worktext = text;
-	var output="";
+	var output = "";
 	while(1){
 		//get the first occurrence of an escape tag, hash that away and keep going
 		var codeparts = worktext.split("`");
@@ -876,6 +906,10 @@ function formatQuote(content){
 	//put back links
 	linkparts = output.split("[[");
 	output = interleave(linkparts,linkhashurl,'','','','');	
+	
+	//simplify link format
+	output = output.replace(/\[\r\[\r(.*?)@@\1\]\]/g,"[[$1]]");
+	
 	//put back math
 	mathparts = output.split("$$");
 	output = interleave(mathparts, mathhash,'$$','$$','$$',' $$');
@@ -1150,10 +1184,12 @@ function showPreview(){
 }
 
 //turn my formatting syntax into HTML for display
-function getHTMLfromSavvyCode(savvyCode, domath, author){
+function getHTMLfromSavvyCode(savvyCode, domath, author, compress){
 	if(disableMath){
 		domath = false;
 	}
+	
+	if(compress == undefined) compress = false;
 	
 	//escape stuff
 	var worktext = savvyCode.replace(/\r/g,"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\\\(/g,"\\<a></a>(");
@@ -1263,29 +1299,54 @@ function getHTMLfromSavvyCode(savvyCode, domath, author){
 	var output = hashstuff(worktext,codehash,mathhash,linkhashname,linkhashurl)
 	
 	//do formatting
-	output = output.replace(/\*\*([\s\S]*?)\*\*/g,'<strong>$1</strong>').replace(/\*\*([\s\S]*?)$/,'<strong>$1</strong>');
-	output = output.replace(/\/\/([\s\S]*?)\/\//g,'<em>$1</em>').replace(/\/\/([\s\S]*?)$/,'<em>$1</em>')
-	output = output.replace(/__([\s\S]*?)__/g,'<span class="strikethrough">$1</span>').replace(/__([\s\S]*?)$/,'<span class="strikethrough">$1</span>');
+	var btags = '<strong>$1</strong>';
+	var itags = '<em>$1</em>';
+	var stags = '<span class="strikethrough">$1</span>';
+	if(compress){
+		btags = '<b$1b>';
+		itags = '<i$1i>';
+		stags = '<s$1s>';
+	}
+	output = output.replace(/\*\*([\s\S]*?)\*\*/g,btags).replace(/\*\*([\s\S]*?)$/,btags);
+	output = output.replace(/\/\/([\s\S]*?)\/\//g,itags).replace(/\/\/([\s\S]*?)$/,itags)
+	output = output.replace(/__([\s\S]*?)__/g,stags).replace(/__([\s\S]*?)$/,stags);
 	
 	
 	if(multiline){
 		//add quotes
 		output = "\r" + output + "\r";
-		output = output.replace(/([\r\n]&gt;.*?)+[\r\n]/g,addQuotes);
+		output = output.replace(/([\r\n]&gt;.*?)+[\r\n]/g,function(savvyCode){return addQuotes(savvyCode,compress);});
 		
 		//add dot points
 		output = "\r" + output + "\r";
-		output = output.replace(/([\r\n]- .*?)+[\r\n]/g,addDotPoints);
+		output = output.replace(/([\r\n]- .*?)+[\r\n]/g,function(savvyCode){return addDotPoints(savvyCode,compress);});
+	}
+	
+	var citags = ['<span class="code">','</span>'];
+	var cbtags = ['<pre class="code">','</pre>'];
+	var atags = ['<a target="_blank" href="[[">','</a>'];
+	var mitags = ['<span class="mathplaceholderinline">','</span>'];
+	var mbtags = ['<div class="mathplaceholderblock">','</div>'];
+	if(domath){
+		mitags = ['\\(','\\)'];
+		mbtags = ['$$',' $$'];
+	}
+	if(compress){
+		citags = ['<c','c>'];
+		cbtags = ['<x','x>'];
+		atags = ['<a[[<>','a>'];
+		mitags = ['<m','m>'];
+		mbtags = ['<z','z>'];
 	}
 	
 	//put back code
 	if(multiline) output = "\r" + output + "\r";
 	codeparts = output.split("`");
-	output = interleave(codeparts,codehash,'<span class="code">','</span>','<pre class="code">','</pre>');
+	output = interleave(codeparts,codehash,citags[0],citags[1],cbtags[0],cbtags[1]);
 	
 	//put back text part of links
 	linkparts = output.split("[[");
-	output = interleave(linkparts,linkhashname,'<a target="_blank" href="[[">','</a>','<a target="_blank" href="[[">','</a>');
+	output = interleave(linkparts,linkhashname,atags[0],atags[1],atags[0],atags[1]);
 
 	//put back links
 	linkparts = output.split("[[");
@@ -1294,14 +1355,14 @@ function getHTMLfromSavvyCode(savvyCode, domath, author){
 	//put back math
 	if(multiline) output = "\r" + output + "\r";
 	mathparts = output.split("$$");
-	if(domath){
-		output = interleave(mathparts, mathhash,'\\(','\\)','$$',' $$');
-	}else{
-		output = interleave(mathparts, mathhash,'<span class="mathplaceholderinline">','</span>','<div class="mathplaceholderblock">','</div>');
-	}
+	output = interleave(mathparts, mathhash,mitags[0],mitags[1],mbtags[0],mbtags[1]);
 	
 	//add newlines
-	output = output.replace(/\r/g,'').replace(/\n/g,'<br />');
+	if(compress){
+		output = output.replace(/\r/g,'').replace(/\n/g,'<r');
+	}else{
+		output = output.replace(/\r/g,'').replace(/\n/g,'<br />');
+	}
 	if(metahead == "me"){
 		if(output.substr(0,1) != " ") output = " " + output;
 		return {meta:meta,html:"",authortext:author + output};
@@ -1310,8 +1371,8 @@ function getHTMLfromSavvyCode(savvyCode, domath, author){
 }
 
 //recursive helper function that uses an undocumented feature of replace() to parse nested ">" quote tags
-function addQuotes(savvyCode){
-	var content = savvyCode.replace(/([\n\r])&gt;/g,"$1").replace(/^\n|\n$/g,'').replace(/([\r\n]&gt;.*?)+[\r\n]/g,addQuotes);
+function addQuotes(savvyCode,compress){
+	var content = savvyCode.replace(/([\n\r])&gt;/g,"$1").replace(/^\n|\n$/g,'').replace(/([\r\n]&gt;.*?)+[\r\n]/g,function(savvyCode){return addQuotes(savvyCode,compress);});
 	if(content.replace(/\r/g,"") == ""){
 		content = "<br />";
 	}
@@ -1319,12 +1380,21 @@ function addQuotes(savvyCode){
 	if(/^[\r\n]*&lt; *.*?[\n\r]/.test(content)){
 		content = content.replace(/^[\r\n]*&lt; *(.*?)[\n\r]/,"")
 		//this is a spoiler
-		return '\r<blockquote><a onclick="if(this.nextSibling.style.display==&quot;none&quot;){this.nextSibling.style.display=&quot;block&quot;;scrollDown();}else{this.nextSibling.style.display=&quot;none&quot;}return false;" href="">Show/Hide ' + RegExp.$1 + '</a><div style="display:none;">' + content + '</div></blockquote>\r';
+		if(compress){
+			return '\r<t' + RegExp.$1 + 't><p' + content + 'p>\r';
+		}
+		return '\r<blockquote><a onclick="if(this.nextSibling.style.display==&quot;none&quot;){this.nextSibling.style.display=&quot;block&quot;;scrollDown();}else{this.nextSibling.style.display=&quot;none&quot;}return false;" href="">Show/Hide <span class="collapsetitle">' + RegExp.$1 + '</span></a><div style="display:none;">' + content + '</div></blockquote>\r';
+	}
+	if(compress){
+		return '\r<q\r' + content + '\rq>\r';
 	}
 	return '\r<blockquote>\r' + content + '\r</blockquote>\r';
 }
 
-function addDotPoints(savvyCode){
+function addDotPoints(savvyCode,compress){
+	if(compress){
+		return "<u" + savvyCode.replace(/[\r\n]/g,"\r\r").replace(/\r- (.*?)\r/g,"<l$1l>") + "u>"
+	}
 	return "<ul>" + savvyCode.replace(/[\r\n]/g,"\r\r").replace(/\r- (.*?)\r/g,"<li>$1</li>") + "</ul>"
 }
 
@@ -1663,7 +1733,7 @@ function onLoadBody(){
 	
 	window.onbeforeunload = function(){
 		//this is flaky
-		sendMessage('/closed');
+		sendMessage('/closed', {param: 'u=' + userid + '&t=' + tokenid});
 	}
 	
 	scrollDown();
@@ -1707,6 +1777,9 @@ function onLoadBody(){
 		}
 		recievePost({author:ip[i].childNodes[0].innerHTML, content:unescapedContent, date:ip[i].childNodes[2].innerHTML, recipients:recipients},true);
 	}
+	
+	setIcon();//maybe this should be *before* page load...
+	
 	openChannel();
 }
 
@@ -1793,7 +1866,7 @@ function goToView(dest) {
 			</form>
 		</div>
 		<div id="footer">
-			SavvyChat was built with the <a href="http://code.google.com/appengine/">Google App Engine SDK</a> by <a href="mailto:fearthekwan@gmail.com">Matthew Kwan</a> for private use. Last update was on 21 Feb 2011.
+			SavvyChat was built with the <a href="http://code.google.com/appengine/">Google App Engine SDK</a> by <a href="mailto:fearthekwan@gmail.com">Matthew Kwan</a> for private use. Last update was on 25 Feb 2011.
 		</div>
 	</div>
 </div>

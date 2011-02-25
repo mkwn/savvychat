@@ -75,8 +75,42 @@ def broadcast(post):
 	message = simplejson.dumps(makePostObject(post))
 	for token in tokens:
 		channel.send_message(token, message)
+
+def decompressHTML(html):
+	workhtml = html
+	pairs=[("b>","</b>"),
+		("<b","<b>"),		
+		("i>","</i>"),
+		("<i","<i>"),
+		("<s",'<span style="text-decoration:line-through;">'),
+		("s>","</span>"),
+		("<q",'<blockquote style="border:solid;border-left:none;border-right:none;border-width: 1px;">'),
+		("q>","</blockquote>"),
+		("<t","<div>Highlight below to show "),
+		("t>",":</div>"),
+		("<p",'<blockquote style="background-color:white;color:white;">'),
+		("p>","</blockquote>"),
+		("<l","<li>"),
+		("l>","</li>"),
+		("<u","<ul>"),
+		("u>","</ul>"),
+		("<c",'<span style="font-family:Courier New,monospace;background-color:#EEE;">'),
+		("c>","</span>"),
+		("<x",'<pre style="font-family:Courier New,monospace;background-color:#EEE;">'),
+		("x>","</pre>"),
+		("<a",'<a href="'),
+		("<>",'">'),
+		("a>","</a>"),
+		("<m",'<span style="font-family:Courier New,monospace;">'),
+		("m>","</span>"),
+		("<z",'<div style="font-family:Courier New,monospace;text-align:center;">'),
+		("z>","</div>"),
+		("<r","<br>")]
+	for p in pairs:
+		workhtml = workhtml.replace(p[0],p[1])
+	return workhtml
 		
-def call(recipients=[], author="a user", content=""):
+def call(recipients=[], author="a user", plaincontent="", htmlcontent=""):
 	if recipients == []:
 		return
 	#send out emails
@@ -90,7 +124,6 @@ def call(recipients=[], author="a user", content=""):
 	else:
 		for recipient in recipients:
 			chatuser = getUserFromName(recipient.title())
-			#this isnt working, maybe uppercaseness
 			if chatuser:
 				TOarray = TOarray + [chatuser.name + ' <' + chatuser.email + '>']
 	if TOarray == []:
@@ -98,7 +131,8 @@ def call(recipients=[], author="a user", content=""):
 	mail.send_mail(sender='SavvyChat Mailer <mailer@savvychat.appspotmail.com>',
 					to=', '.join(TOarray),
 					subject="You have been called by "+author+" with SavvyChat",
-					body="Here is an unformatted preview of the post:\n\n"+content)
+					body=plaincontent,
+					html=htmlcontent)
 
 def removeWhitespace(data):
 	return ''.join(data.split())
@@ -141,43 +175,37 @@ def makePostObject(post):
 		author = author.name
 	return {"content":post.content,"author":author,"date":str(time.mktime(post.date.timetuple())),"recipients":post.recipients}
 
-class OpenedPage(webapp.RequestHandler):
-	def post(self):
-		#called when a new connection is created
-		#THIS PAGE IS CURRENTLY UNUSED
-		chatuser = getUserFromId(self.request.get('u'))
-		#chatuser = Chatuser()
-		chatuser.tokens = chatuser.tokens + [self.request.get('t')]
-		chatuser.lastrefreshlist = chatuser.lastrefreshlist + [datetime.utcnow()]
-		chatuser.lastonline = datetime.utcnow()
-		chatuser.put()
-		
-		#send a message so we can check whether the channel is truly open
-		#channel.send_message(chatuser.tokens, simplejson.dumps({'verify':0}))
-	
 class PostPage(webapp.RequestHandler):
 	def post(self):
 		#called on recieving a post
+		user = users.get_current_user()
+		if not user:
+			return
+		
 		post = Post()
-		post.author = self.request.get('u')
+		post.author = user.user_id()
 		post.content = self.request.get('p')
 		
+		authoruser = getUserFromId(post.author)
+		if not authoruser:
+			return
+		
 		post.recipients = []#for call
-		calltext = post.content
+		contenttext = post.content
 		
 		#check for meta
 		metahead = ""
 		m = re.match(r"\|+([^\|]+?)(\|+|$)([\s\S]*)", post.content)
 		if m:
 			#we have meta
-			meta,calltext = m.group(1,3)
+			meta,contenttext = m.group(1,3)
 			meta = removeWhitespace(meta.lower())
 			metaparts = meta.split(":")
 			metahead = metaparts[0]
 			#check if topic was changed
 			if metahead == "topic":
 				Global.set('topic',post.content.replace("\n"," "))
-				
+			
 			#check if users were called
 			if metahead == "call":
 				if len(metaparts) == 1:
@@ -196,14 +224,46 @@ class PostPage(webapp.RequestHandler):
 					post.recipients = list(Set(callstring.split(",")[1:-1]))
 					if "all" in post.recipients:
 						post.recipients = ["all"]
+				
 		if metahead != "notify":
 			post.put()
 		else:
 			post.date = datetime.now()
 		broadcast(post)
-		authoruser = getUserFromId(post.author)
+		authoruser.lastonline = datetime.utcnow()
 		authoruser.put()
-		call(post.recipients,authoruser.name,calltext)
+		#call(post.recipients,authoruser.name,contenttext)
+		
+class CallPage(webapp.RequestHandler):
+	def post(self):
+		user = users.get_current_user()
+		if not user:
+			return
+		chatuser = getUserFromId(user.user_id())
+		if not chatuser:
+			return
+		recipients=[]
+		callstring = ',' + self.request.get('r').lower() + ','
+		if callstring == ",,":
+			#no arguments, call all
+			recipients = ["all"]
+		else:
+			#replace aliases
+			aliasData = open("aliases.txt")
+			aliasList = aliasData.readlines()
+			aliasData.close()
+			for aliasRow in aliasList:
+				#replace aliases
+				alias, result = tuple(aliasRow.rstrip().split(" "))
+				callstring = callstring.replace(","+alias+",",","+result+",")
+			recipients = list(Set(callstring.split(",")[1:-1]))
+			if "all" in recipients:
+				recipients = ["all"]
+		chatuser.lastonline = datetime.utcnow()
+		chatuser.put()
+		call(recipients,chatuser.name,
+			"no plaintext preview available, sign in to savvychat (http://savvychat.appspot.com) to view message",
+			decompressHTML(self.request.get('h')))
 			
 class RetrievePage(webapp.RequestHandler):
 	def post(self):
@@ -251,8 +311,13 @@ class TokenPage(webapp.RequestHandler):
 	def post(self):
 		#called when connection expires
 		#remove old token in db
-		userid = self.request.get('u')
+		user = users.get_current_user()
+		if not user:
+			return
+		userid = user.user_id()
 		chatuser = getUserFromId(userid)
+		if not chatuser:
+			return
 		tokenindex = chatuser.tokens.index(self.request.get('t'))
 		del chatuser.tokens[tokenindex]
 		del chatuser.lastrefreshlist[tokenindex]
@@ -290,7 +355,12 @@ class TonePage(webapp.RequestHandler):
 	def post(self):
 		#called when someone changes the alert tone settings
 		#remove token
-		chatuser = getUserFromId(self.request.get('u'))
+		user = users.get_current_user()
+		if not user:
+			return
+		chatuser = getUserFromId(user.user_id())
+		if not chatuser:
+			return
 		tone = self.request.get('a')
 		if tone == "true":
 			chatuser.playtone = True
@@ -431,8 +501,8 @@ class MainPage(webapp.RequestHandler):
 		
 application = webapp.WSGIApplication([
 									('/', MainPage),
-									('/opened', OpenedPage),
 									('/post', PostPage),
+									('/call', CallPage),
 									('/retrieve', RetrievePage),
 									('/sync', SyncPage),
 									('/tone', TonePage),
