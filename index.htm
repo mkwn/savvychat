@@ -441,10 +441,18 @@ function onOpen(){
 	//sendMessage('/opened');
 	sync();
 }
-
-function allowSend(allow){
-	disableSend = !allow;
-	document.getElementById('postbutton').disabled = !allow;
+var allowance = {};
+function allowSend(allow,cause){
+	allowance["cause"] = allow;
+	for(var cause in allowance){
+		if(!allowance[cause]){
+			disableSend = true;
+			document.getElementById('postbutton').disabled = true;
+			return;
+		}
+	}
+	disableSend = false;
+	document.getElementById('postbutton').disabled = false;
 }
 
 //var badChannelTimeout;
@@ -471,13 +479,13 @@ function onClose(){
 		tokenid = arr.shift();
 		token = arr.join("@@");
 		openChannel();
-		allowSend(true);
+		allowSend(true,"error");
 	};
 	sendMessage('/token',{callback:callback, param: 't=' + tokenid});
 	//badChannelTimeout = setTimeout(function(){
 		//displayNote("Session expired or failed. Savvychat will attempt to aquire a new connection, but possibly you may need to refresh the page.");});
 	//sendMessage('/closed');
-	allowSend(false);
+	allowSend(false,"error");
 	//alert("SavvyChat session expired or broke.");
 }
 
@@ -595,9 +603,6 @@ function logout(){
 	location.href="{{ logouturl }}";
 }
 
-function queuePost(){
-}
-
 //send a new post to the server
 function sendPost(){
 	var text = document.getElementById("composefield").value.replace(/\r/g,"");
@@ -660,15 +665,20 @@ function sendPost(){
 			sync();
 			return;
 			break;
+		case "upload":
+			//open upload dialog box
+			showUpload();
+			return;
+			break;
 		}
 	}
 	
-	if(disableSend)return;
+	if(disableSend) return;
 	
-	if(text == "") return;
+	//if(text == "") return;
 	var callback = function(response){
 		//i should actually queue here
-		//allowSend(true);
+		allowSend(true,"post");
 	};
 	var enctext = encodeURIComponent(text);
 	
@@ -693,7 +703,6 @@ function sendPost(){
 			displayNote('Tagged message too long, was not sent. Remove "' + metahead + '" tag from your message or shorten it.');
 			return;
 		}
-		allowSend(false);
 		var partNo = 1;
 		var blockSize = enctext.length - excess; //i don't want to hardcode it in case i change something in sendMessage
 		processParts(partNo, blockSize, text, enctext)
@@ -701,6 +710,7 @@ function sendPost(){
 	document.getElementById("preview").innerHTML = "";
 	document.getElementById("authorpreview").innerHTML = username + ":";
 	document.getElementById("composefield").value = "";
+	allowSend(false,"post");
 	//recievePost({content:document.getElementById("composefield").value,author:username,date:"1/3/11, 13:30 EST"});
 }
 
@@ -737,11 +747,11 @@ function processParts(partNo, blockSize, text, enctext){
 	var postcontent = meta + part
 	if(enctext == ""){
 		//done
-		allowSend(true);
-		callback = function(response){}
-		//callback = function(response){
-			//allowSend(true);
-		//};
+		//allowSend(true);
+		//callback = function(response){}
+		callback = function(response){
+			allowSend(true,"post");
+		};
 		postcontent = encodeURIComponent("|cont:" + (partNo-1) + ",0|") + part
 	}
 	sendMessage('/post', {param: 'p=' + postcontent, callback: callback});
@@ -820,6 +830,38 @@ function recieveSync(posts){
 	//if (interdiv.previousSibling.childNodes[1].innerHTML==interdiv.childNodes[1].innerHTML){
 		//interdiv.childNodes[1].style.display="None";
 	//}
+}
+
+//show/hide upload dialog
+//var uploading = false;
+function loadiFrame(){}
+function hideUpload(){
+	//alert(document.getElementById("uploadinput").value);
+	//uploading = false;
+	allowSend(true,"upload");
+	document.getElementById("uploadform").style.display = "none";
+	//document.getElementById("composefield").value = cachedText;
+	cachedText = document.getElementById("composefield").style.visibility = "visible";//disabled = false;
+	document.getElementById("composefield").focus();
+}
+function showUpload(){
+	//uploading = true;
+	allowSend(false,"upload");
+	cachedText = document.getElementById("composefield").value;
+	//document.getElementById("composefield").value = "";
+	//document.getElementById("composefield").style.visibility = "hidden";//disabled = true;
+	document.getElementById("uploadform").style.display = "block";
+	document.getElementById("uploadinput").focus();
+}
+
+//check there's a file selected
+function validateFile(){
+	element = document.getElementById("uploadinput");
+	if(element.value == ""){
+		document.getElementById("uploadbutton").disabled = true;
+	}else{
+		document.getElementById("uploadbutton").disabled = false;
+	}
 }
 
 //helper function since we require to hash the 3 different escaping tags in both autoquote() and getHTMLfromSavvyCode()
@@ -1167,12 +1209,22 @@ function openHelp(){
 }
 
 //update the content of the preview post
+var cachedText = "";
 function showPreview(){
+	var composetext = document.getElementById("composefield").value;
+	if(composetext == ""){
+		allowSend(false,"empty");
+	}else{
+		allowSend(true,"empty");
+	}
+	//if(uploading) return;
+	if(cachedText == composetext) return;
+	cachedText = composetext;
 	if(!dopreview){
 		return;
 	}
 	
-	var parsedObj = getHTMLfromSavvyCode(document.getElementById("composefield").value, mathpreview, username);
+	var parsedObj = getHTMLfromSavvyCode(composetext, mathpreview, username);
 	
 	document.getElementById("preview").innerHTML = parsedObj.html;
 	document.getElementById("authorpreview").innerHTML = parsedObj.authortext;
@@ -1280,6 +1332,9 @@ function getHTMLfromSavvyCode(savvyCode, domath, author, compress){
 			str = 'Special command to synchronize the discussion in case you failed to recieve some messages';
 			if(syncing)str = "Syncing in progress, command disabled";
 			return {meta:'sync',html:'<strong>'+str+' (will not send)</strong>', authortext:authortext};
+			break;
+		case "upload":
+			return {meta:'upload',html:'<strong>Special command to open upload dialog (will not send)</strong>', authortext:authortext};
 			break;
 		default:
 			return {meta:meta,html:'<strong>Unknown tag &quot;'+parts[0]+'&quot;</span></strong>', authortext:authortext};
@@ -1726,8 +1781,8 @@ function onLoadBody(){
 	
 	//size everything
 	fitWindow();
-	ww=0;
-	wh=0;
+	ww = 0;
+	wh = 0;
 	setTimeout("fitWindow();",100);//some browsers require a few ms to set up the page before resizing can take place
 	if(!gadget) window.onresize = fitWindow;
 	
@@ -1737,7 +1792,8 @@ function onLoadBody(){
 	}
 	
 	scrollDown();
-	setInterval("scrollDown();",300);
+	setInterval("scrollDown();showPreview();",300);
+	//showPreview();
 	//that shouldnt actually be necessary because scrolldown is automatically called whenever something could scroll the page
 	
 	if(gadget){
@@ -1767,6 +1823,15 @@ function onLoadBody(){
 		else if(textarea.attachEvent) textarea.attachEvent('on'+etype, checkKeys);
 		else textarea['on'+etype] = checkKeys;
 	
+	//file upload
+	document.getElementById("uploadform").onsubmit = function() {
+		document.getElementById("uploadform").target = "uploadtarget";
+		loadiFrame = displayUpload;
+	}
+	document.getElementById("uploadinput").value = "";
+	document.getElementById("uploadbutton").disabled = true;
+	//hideUpload();
+	
 	//parse initial posts
 	var ip = document.getElementById("initialposts").childNodes;
 	for(var i=ip.length-1;i>=0;i--){
@@ -1783,6 +1848,20 @@ function onLoadBody(){
 	openChannel();
 }
 
+//display the url of the uploaded object
+function displayUpload(){
+	var data = frames['uploadtarget'].document.getElementsByTagName("body")[0].innerHTML;
+	hideUpload();
+	/\.(.*)$/.exec(data);
+	var e = RegExp.$1;
+	var path = document.location.href.replace(/[^/]*$/,"") + data;
+	var str = "[[" + path + "]]";
+	if(e=="png"||e=="jpg"||e=="jpeg"||e=="gif"||e=="bmp"){
+		str = "|img|"+path;
+	}
+	document.getElementById("composefield").value = str;
+	showPreview();
+}
 
 function onBlur (){
 	windowFocus = false;
@@ -1855,15 +1934,22 @@ function goToView(dest) {
 		</div>
 		</div>
 		<div id="compose">
-			<form id="composeform" onsubmit="sendPost(); return false;">
-				<div id="controls"><div><textarea id="composefield" onkeyup="showPreview();" autofocus="autofocus"></textarea></div>
-				<div><input id="postbutton" type="submit" value="Post (Shift+Enter)">&nbsp;&nbsp;
-				<span id="supercheckpreview"><input id="previewcheck" type="checkbox" onclick="togglePreview(this);" /><label for="previewcheck" id="previewchecklabel">live preview&nbsp;&nbsp;</label></span><input id="alertcheck" type="checkbox" onclick="toggleAlert(this);" /><label for="alertcheck" id="alertchecklabel">play alert tone</label>
-				{% if gadget %}
-				&nbsp;&nbsp;<a onclick="expand();" href="javascript:window.open('http://savvychat.appspot.com');">Expand</a>
-				{% endif %}
+			<!--<form id="composeform" onsubmit="sendPost(); return false;">-->
+			<div id="controls">
+			<form id="uploadform" action="/upload" enctype="multipart/form-data" method="post" style="display:none;position:absolute;"><div>
+				<input id="uploadinput" type="file" name="file" onchange="validateFile();" /><br />
+				<input id="uploadbutton" type="submit" value="upload" />
+				<input type="button" value="cancel" onclick="hideUpload();"/>
+				<iframe onload="loadiFrame();" id="uploadtarget" name="uploadtarget" src="" style="display:none"></iframe>
+			</div></form>
+			<div><textarea id="composefield" onkeyup="showPreview();" autofocus="autofocus"></textarea></div>
+			<div><input id="postbutton" type="button" value="Post (Shift+Enter)" onclick="sendPost();">&nbsp;&nbsp;
+			<span id="supercheckpreview"><input id="previewcheck" type="checkbox" onclick="togglePreview(this);" /><label for="previewcheck" id="previewchecklabel">live preview&nbsp;&nbsp;</label></span><input id="alertcheck" type="checkbox" onclick="toggleAlert(this);" /><label for="alertcheck" id="alertchecklabel">play alert tone</label>
+			{% if gadget %}
+			&nbsp;&nbsp;<a onclick="expand();" href="javascript:window.open('http://savvychat.appspot.com');">Expand</a>
+			{% endif %}
 				</div></div>
-			</form>
+			<!--</form>-->
 		</div>
 		<div id="footer">
 			SavvyChat was built with the <a href="http://code.google.com/appengine/">Google App Engine SDK</a> by <a href="mailto:fearthekwan@gmail.com">Matthew Kwan</a> for private use. Last update was on 25 Feb 2011.

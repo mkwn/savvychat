@@ -1,5 +1,4 @@
 PRIORITY 0: DEFECTS
-queue posts with verify
 i keep getting connection error instead of resent token
 I had an issue where the preview text was not inline with the authortext in the label
 limit topic length
@@ -7,8 +6,10 @@ secure each url to prevent impersonation etc.
 time out all requests
 clean up long message sending
 onbeforeunload not firing in gadget mode
+when file is too large, error should be returned
 
 PRIORITY 1: IMPORTANT
+make "this" refer to the <a>
 |status with average latency and connection expiry
 autoparse parentheses like (http://a)
 call showpreview only if changed
@@ -31,8 +32,8 @@ gmail gadget
 	when gadget is minimized, disable
 	dynamic resizing with |+ and |-
 x minutes ago/x seconds ago for dates
-format call emails a little better
 press up in empty textbox to get last message
+queue posts with verify instead of disabling send
 
 PRIORITY 2: COMPLICATED
 allow to invite guest

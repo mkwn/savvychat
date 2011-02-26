@@ -58,6 +58,12 @@ class Chatuser(db.Model):
 	lastrefreshlist = db.ListProperty(datetime)
 	playtone = db.BooleanProperty(default=False)
 	lastonline = db.DateTimeProperty()
+	
+class File(db.Model):
+	#for file upload
+	type = db.StringProperty()
+	#name = db.StringProperty()
+	data = db.BlobProperty()
 
 def fetchTokens():
 	#tokens = memcache.get("tokens")
@@ -498,6 +504,30 @@ class MainPage(webapp.RequestHandler):
 							'container':container,
 							'disableMath':disableMath}
 		self.response.out.write(template.render('index.htm', template_values))
+
+class UploadPage(webapp.RequestHandler):
+	def post(self):
+		fileobj = self.request.POST["file"]
+		file = File()
+		file.data = fileobj.value
+		file.type = fileobj.type
+		#file.name = fileobj.filename
+		file.put()
+		hlog(fileobj.filename)
+		#internet explorer gives full path, reduce it:
+		filename = re.sub(r"^.*\\","",fileobj.filename)
+		hlog(filename)
+		self.response.out.write("download/"+str(file.key().id()) + "/" + filename)
+		#self.response.headers['Content-Type'] = file.type
+		#self.response.headers['Content-Disposition'] = "attachment; filename=" + file.name
+		#self.response.out.write(file.data)
+		
+class DownloadHandler(webapp.RequestHandler):
+	def get(self, id, filename):
+		file = File.get_by_id(int(id))
+		self.response.headers['Content-Type'] = file.type
+		self.response.out.write(file.data)
+		
 		
 application = webapp.WSGIApplication([
 									('/', MainPage),
@@ -507,6 +537,8 @@ application = webapp.WSGIApplication([
 									('/sync', SyncPage),
 									('/tone', TonePage),
 									('/token', TokenPage),
+									('/upload', UploadPage),
+									('/download/(\d+)/(.*)', DownloadHandler),
 									('/closed', ClosedPage)])
 
 def main():
