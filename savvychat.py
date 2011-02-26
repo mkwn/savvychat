@@ -513,10 +513,8 @@ class UploadPage(webapp.RequestHandler):
 		file.type = fileobj.type
 		#file.name = fileobj.filename
 		file.put()
-		hlog(fileobj.filename)
 		#internet explorer gives full path, reduce it:
 		filename = re.sub(r"^.*\\","",fileobj.filename)
-		hlog(filename)
 		self.response.out.write("download/"+str(file.key().id()) + "/" + filename)
 		#self.response.headers['Content-Type'] = file.type
 		#self.response.headers['Content-Disposition'] = "attachment; filename=" + file.name

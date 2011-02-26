@@ -7,6 +7,7 @@ time out all requests
 clean up long message sending
 onbeforeunload not firing in gadget mode
 when file is too large, error should be returned
+add upload to help
 
 PRIORITY 1: IMPORTANT
 make "this" refer to the <a>
