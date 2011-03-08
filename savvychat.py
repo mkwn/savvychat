@@ -515,7 +515,11 @@ class UploadPage(webapp.RequestHandler):
 		file.data = fileobj.value
 		file.type = fileobj.type
 		#file.name = fileobj.filename
-		file.put()
+		try:
+			file.put()
+		except:
+			doPost("|notify|File upload failed","SavvyChat")
+			return
 		#internet explorer gives full path, reduce it:
 		filename = re.sub(r"^.*\\","",fileobj.filename)
 		path = "download/"+str(file.key().id()) + "/" + filename

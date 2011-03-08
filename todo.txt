@@ -13,6 +13,7 @@ use message id for call
 try to use fake ajax to remove limit
 
 PRIORITY 1: IMPORTANT
+allow call for arbitrary email
 clean up long message sending
 perhaps can use hidden form and iframe to avoid needing to deal with long messages
 time out all requests
