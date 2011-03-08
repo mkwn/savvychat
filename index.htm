@@ -443,7 +443,7 @@ function onOpen(){
 }
 var allowance = {};
 function allowSend(allow,cause){
-	allowance["cause"] = allow;
+	allowance[cause] = allow;
 	for(var cause in allowance){
 		if(!allowance[cause]){
 			disableSend = true;
@@ -847,9 +847,9 @@ function hideUpload(){
 function showUpload(){
 	//uploading = true;
 	allowSend(false,"upload");
-	cachedText = document.getElementById("composefield").value;
+	//cachedText = document.getElementById("composefield").value;
 	//document.getElementById("composefield").value = "";
-	//document.getElementById("composefield").style.visibility = "hidden";//disabled = true;
+	document.getElementById("composefield").style.visibility = "hidden";//disabled = true;
 	document.getElementById("uploadform").style.display = "block";
 	document.getElementById("uploadinput").focus();
 }
@@ -1826,7 +1826,8 @@ function onLoadBody(){
 	//file upload
 	document.getElementById("uploadform").onsubmit = function() {
 		document.getElementById("uploadform").target = "uploadtarget";
-		loadiFrame = displayUpload;
+		hideUpload();
+		//loadiFrame = displayUpload;
 	}
 	document.getElementById("uploadinput").value = "";
 	document.getElementById("uploadbutton").disabled = true;

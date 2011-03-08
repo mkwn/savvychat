@@ -161,10 +161,7 @@ def resolveStragglers():
 		
 def hlog(text):
 	#hacky log
-	post = Post()
-	post.author = "hlog"
-	post.content = str(text)
-	post.put()
+	doPost(str(text),"hlog")
 	
 def getUserFromId(id):
 	return db.GqlQuery("SELECT * FROM Chatuser WHERE userid='"+id+"'").get()
@@ -181,64 +178,71 @@ def makePostObject(post):
 		author = author.name
 	return {"content":post.content,"author":author,"date":str(time.mktime(post.date.timetuple())),"recipients":post.recipients}
 
-class PostPage(webapp.RequestHandler):
-	def post(self):
-		#called on recieving a post
+def doPost(content, author=None):
+	if not author:
 		user = users.get_current_user()
 		if not user:
 			return
-		
-		post = Post()
-		post.author = user.user_id()
-		post.content = self.request.get('p')
-		
-		authoruser = getUserFromId(post.author)
+		authoruser = getUserFromId(user.user_id())
 		if not authoruser:
 			return
 		
-		post.recipients = []#for call
-		contenttext = post.content
+	post = Post()
+	post.author = author or user.user_id()
+	post.content = content
+	
+	post.recipients = []#for call
+	contenttext = post.content
+	
+	#check for meta
+	metahead = ""
+	m = re.match(r"\|+([^\|]+?)(\|+|$)([\s\S]*)", post.content)
+	if m:
+		#we have meta
+		meta,contenttext = m.group(1,3)
+		meta = removeWhitespace(meta.lower())
+		metaparts = meta.split(":")
+		metahead = metaparts[0]
+		#check if topic was changed
+		if metahead == "topic":
+			Global.set('topic',post.content.replace("\n"," "))
 		
-		#check for meta
-		metahead = ""
-		m = re.match(r"\|+([^\|]+?)(\|+|$)([\s\S]*)", post.content)
-		if m:
-			#we have meta
-			meta,contenttext = m.group(1,3)
-			meta = removeWhitespace(meta.lower())
-			metaparts = meta.split(":")
-			metahead = metaparts[0]
-			#check if topic was changed
-			if metahead == "topic":
-				Global.set('topic',post.content.replace("\n"," "))
-			
-			#check if users were called
-			if metahead == "call":
-				if len(metaparts) == 1:
-					#no arguments, call all
-					post.recipients = ["all"]
-				else:
-					callstring = ',' + ":".join(metaparts[1:]).lower() + ','
+		#check if users were called
+		if metahead == "call":
+			if len(metaparts) == 1:
+				#no arguments, call all
+				post.recipients = ["all"]
+			else:
+				callstring = ',' + ":".join(metaparts[1:]).lower() + ','
+				#replace aliases
+				aliasData = open("aliases.txt")
+				aliasList = aliasData.readlines()
+				aliasData.close()
+				for aliasRow in aliasList:
 					#replace aliases
-					aliasData = open("aliases.txt")
-					aliasList = aliasData.readlines()
-					aliasData.close()
-					for aliasRow in aliasList:
-						#replace aliases
-						alias, result = tuple(aliasRow.rstrip().split(" "))
-						callstring = callstring.replace(","+alias+",",","+result+",")
-					post.recipients = list(Set(callstring.split(",")[1:-1]))
-					if "all" in post.recipients:
-						post.recipients = ["all"]
-				
-		if metahead != "notify":
-			post.put()
-		else:
-			post.date = datetime.now()
-		broadcast(post)
+					alias, result = tuple(aliasRow.rstrip().split(" "))
+					callstring = callstring.replace(","+alias+",",","+result+",")
+				post.recipients = list(Set(callstring.split(",")[1:-1]))
+				if "all" in post.recipients:
+					post.recipients = ["all"]
+			
+	if metahead != "notify":
+		post.put()
+	else:
+		post.date = datetime.now()
+	broadcast(post)
+	if not author:
 		authoruser.lastonline = datetime.utcnow()
 		authoruser.put()
-		#call(post.recipients,authoruser.name,contenttext)
+	try:
+		return post.key().id() #id for the post
+	except:
+		pass
+	#call(post.recipients,authoruser.name,contenttext)
+class PostPage(webapp.RequestHandler):
+	def post(self):
+		#called on recieving a post
+		self.response.out.write(str(doPost(self.request.get('p'))))
 		
 class CallPage(webapp.RequestHandler):
 	def post(self):
@@ -378,7 +382,6 @@ class TonePage(webapp.RequestHandler):
 class MainPage(webapp.RequestHandler):
 	def get(self):
 		#authenticate, create a token and render the main page
-		
 		user = users.get_current_user()
 		if not user:
 			#not logged in, redirect to login page
@@ -515,7 +518,13 @@ class UploadPage(webapp.RequestHandler):
 		file.put()
 		#internet explorer gives full path, reduce it:
 		filename = re.sub(r"^.*\\","",fileobj.filename)
-		self.response.out.write("download/"+str(file.key().id()) + "/" + filename)
+		path = "download/"+str(file.key().id()) + "/" + filename
+		fullpath = "http://" + self.request.host + "/" + path
+		post = "[[" + fullpath+ "]]"
+		if file.type.find("image") != -1:
+			post = "|img|" + fullpath
+		doPost(post)
+		self.response.out.write(path)
 		#self.response.headers['Content-Type'] = file.type
 		#self.response.headers['Content-Disposition'] = "attachment; filename=" + file.name
 		#self.response.out.write(file.data)

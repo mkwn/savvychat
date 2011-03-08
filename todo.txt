@@ -2,24 +2,28 @@ PRIORITY 0: DEFECTS
 i keep getting connection error instead of resent token
 I had an issue where the preview text was not inline with the authortext in the label
 limit topic length
-secure each url to prevent impersonation etc.
-time out all requests
-clean up long message sending
 onbeforeunload not firing in gadget mode
 when file is too large, error should be returned
 add upload to help
+sync text isnt changing the second time for some reason
+perhaps i should autopost uploaded files
+perhaps i should put file upload on a different server
+what if comet is really slow and sync finishes first? then therell be duplicates
+use message id for call
+try to use fake ajax to remove limit
 
 PRIORITY 1: IMPORTANT
+clean up long message sending
+perhaps can use hidden form and iframe to avoid needing to deal with long messages
+time out all requests
 make "this" refer to the <a>
 |status with average latency and connection expiry
 autoparse parentheses like (http://a)
-call showpreview only if changed
 in preview, spoilers should be open by default/keep opened mode
 nested dot points
 give some context instead of only showing unread
 store icon binary in javascript http://userscripts.org/scripts/review/24430
 color code names
-hidden blockquote for spoilers
 clicking on a name should do something, maybe call?
 |flushtokens
 gmail gadget
@@ -49,7 +53,6 @@ sending a mail to savvychat mailer forwards the mail to savvychat
 option to display online status
 iphone/android app
 	cache messages
-file/image upload
 image draw
 "like" button
 some kind of private message system
