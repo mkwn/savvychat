@@ -546,6 +546,19 @@ function setIcon(path){
 	document.body.removeChild(shim);
 }
 
+//http://stackoverflow.com/questions/2790001/fixing-javascript-array-functions-in-internet-explorer-indexof-foreach-etc
+if (!('indexOf' in Array.prototype)) {
+    Array.prototype.indexOf= function(find, i /*opt*/) {
+        if (i===undefined) i= 0;
+        if (i<0) i+= this.length;
+        if (i<0) i= 0;
+        for (var n= this.length; i<n; i++)
+            if (i in this && this[i]===find)
+                return i;
+        return -1;
+    };
+}
+
 function gotCalled(post){
 	if(post.recipients&&post.recipients.length!=0){
 		if(post.recipients[0]=="all"||post.recipients.indexOf(username.toLowerCase())!=-1){

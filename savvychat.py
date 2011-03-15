@@ -17,6 +17,8 @@ from random import choice
 
 from sets import Set
 
+import urllib
+
 import re
 
 import traceback
@@ -521,7 +523,7 @@ class UploadPage(webapp.RequestHandler):
 			doPost("|notify|File upload failed","SavvyChat")
 			return
 		#internet explorer gives full path, reduce it:
-		filename = re.sub(r"^.*\\","",fileobj.filename)
+		filename = urllib.quote_plus(re.sub(r"^.*\\","",fileobj.filename))
 		path = "download/"+str(file.key().id()) + "/" + filename
 		fullpath = "http://" + self.request.host + "/" + path
 		post = "[[" + fullpath+ "]]"
