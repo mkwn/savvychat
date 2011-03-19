@@ -935,6 +935,8 @@ function formatQuote(content){
 	//find something formatted like a link
 	worktext = "\r" + worktext + "\r";
 	worktext = worktext.replace(/(\s(&gt;)*)((ht|f)tp(s?)\:\/\/[\S]*)(\s)/g,"$1[[$3]]$6");
+	worktext = worktext.replace(/(\s(&gt;)*)((ht|f)tp(s?)\:\/\/[\S]*)(\s)/g,"$1[[$3]]$6");
+	//(two passes to remove adjacent links)
 	
 	//hash code and math
 	var codehash = [];
@@ -1358,6 +1360,8 @@ function getHTMLfromSavvyCode(savvyCode, domath, author, compress){
 	//find something formatted like a link
 	worktext = "\r" + worktext + "\r";
 	worktext = worktext.replace(/(\s(&gt;)*)((ht|f)tp(s?)\:\/\/[\S]*)(\s)/g,"$1[[$3]]$6");
+	worktext = worktext.replace(/(\s(&gt;)*)((ht|f)tp(s?)\:\/\/[\S]*)(\s)/g,"$1[[$3]]$6");
+	//two passes to remove adjacent links
 	
 	//hash code and math so we can do formatting on the rest
 	var codehash = [];
@@ -1966,11 +1970,11 @@ function goToView(dest) {
 			<!--</form>-->
 		</div>
 		<div id="footer">
-			SavvyChat was built with the <a href="http://code.google.com/appengine/">Google App Engine SDK</a> by <a href="mailto:fearthekwan@gmail.com">Matthew Kwan</a> for private use. Last update was on 8 Mar 2011.
+			SavvyChat was built with the <a href="http://code.google.com/appengine/">Google App Engine SDK</a> by <a href="mailto:fearthekwan@gmail.com">Matthew Kwan</a> for private use. Last update was on 19 Mar 2011.
 		</div>
 	</div>
 </div>
-<div id="dummy" style="display:none;">$$$$</div>
+<div id="dummy" style="display:none;">$$$=\newcommand{\angle}[1]{ {\overline #1|} }$$</div>
 <!--The following is a dummy div where all the initial posts can be dumped while escaping unicode etc-->
 <pre id="initialposts" style="display:none;">{% for post in posts %}<pre><pre>{{ post.author }}</pre><pre>{{ post.content|escape }}</pre><pre>{{ post.date }}</pre>{% for recipient in post.recipients %}<pre>{{ recipient }}</pre>{% endfor %}</pre>{% endfor %}</pre>
 
