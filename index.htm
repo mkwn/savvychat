@@ -1136,7 +1136,7 @@ function recievePost(post,ignoretopics,prepend){
 		//var escapedPost = post.content.replace(/\\/g,"\\\\").replace(/\n/g,"\\n").replace(/"/g,"\\&quot;");
 		//quoteHTML = '<a href="" onclick="autoquote(&quot;'+escapedPost+'&quot;,&quot;'+post.author+'&quot;,&quot;'+parsedDate+'&quot;);return false;" title="quote this post">'+parsedDate+'</a>';
 	//}
-	var divHTML='<div class="datelabel">'+quoteHTML+'</div><span class="author">'+parsedObj.authortext+'</span><span class="postcontent">' + parsedObj.html + '</span>';
+	var divHTML='<div class="datelabel">'+quoteHTML+'</div> <span class="author">'+parsedObj.authortext+'</span><span class="postcontent">' + parsedObj.html + '</span>';
 	var newdiv = document.createElement('div');
 	newdiv.innerHTML = divHTML;
 	newdiv.firstChild.firstChild.href = "";
@@ -1164,7 +1164,7 @@ function recievePost(post,ignoretopics,prepend){
 					//newdiv.style.marginTop = "0";
 					//newdiv.style.paddingTop = "0";
 					//postlist.lastChild.style.paddingBottom = "0";
-					//postlist.lastChild.innerHTML += "<hr />";
+					//postlist.lastChild.innerHTML += "<hr SLASH>";
 				}
 			}
 		}
@@ -1181,7 +1181,7 @@ function recievePost(post,ignoretopics,prepend){
 					//postlist.firstChild.style.marginTop = "0";
 					//postlist.firstChild.style.paddingTop = "0";
 					//newdiv.style.paddingBottom = "0";
-					//newdiv.innerHTML += "<hr />";
+					//newdiv.innerHTML += "<hr SLASH>";
 				}
 			}
 		}
@@ -1258,7 +1258,7 @@ function getHTMLfromSavvyCode(savvyCode, domath, author, compress){
 	if(compress == undefined) compress = false;
 	
 	//escape stuff
-	var worktext = savvyCode.replace(/\r/g,"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\\\(/g,"\\<a></a>(");
+	var worktext = savvyCode.replace(/\r/g,"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/\>/g,"&gt;").replace(/"/g,"&quot;").replace(/\\\(/g,"\\<a></a>(");
 	
 	//first check for a meta tag at the beginning of the text
 	var authortext=author + ": ";
@@ -1282,7 +1282,7 @@ function getHTMLfromSavvyCode(savvyCode, domath, author, compress){
 		case "img":
 			var url = worktext.replace(/\n/g,"")
 			var onload = "setTimeout(&quot;scrollDown();ww=0;fitWindow();&quot;,1);"
-			return {meta:'img',html:'<br /><a target="_blank" href="' + url + '"><img onerror="' + onload + '" onload="' + onload + '" src="' + url + '" /></a>', authortext:authortext};
+			return {meta:'img',html:'<br /'+'><a target="_blank" href="' + url + '"><img onerror="' + onload + '" onload="' + onload + '" src="' + url + '" /'+'></a>', authortext:authortext};
 			break;
 		case "me":
 			multiline = false;
@@ -1368,7 +1368,6 @@ function getHTMLfromSavvyCode(savvyCode, domath, author, compress){
 	var linkhashname = [];
 	var linkhashurl = [];
 	var output = hashstuff(worktext,codehash,mathhash,linkhashname,linkhashurl)
-	
 	//do formatting
 	var btags = '<strong>$1</strong>';
 	var itags = '<em>$1</em>';
@@ -1393,8 +1392,8 @@ function getHTMLfromSavvyCode(savvyCode, domath, author, compress){
 		output = output.replace(/([\r\n]- .*?)+[\r\n]/g,function(savvyCode){return addDotPoints(savvyCode,compress);});
 	}
 	
-	var citags = ['<span class="code">','</span>'];
-	var cbtags = ['<pre class="code">','</pre>'];
+	var citags = ['<span class="code tex2jax_ignore">','</span>'];
+	var cbtags = ['<pre class="code tex2jax_ignore">','</pre>'];
 	var atags = ['<a target="_blank" href="[[">','</a>'];
 	var mitags = ['<span class="mathplaceholderinline">','</span>'];
 	var mbtags = ['<div class="mathplaceholderblock">','</div>'];
@@ -1432,7 +1431,7 @@ function getHTMLfromSavvyCode(savvyCode, domath, author, compress){
 	if(compress){
 		output = output.replace(/\r/g,'').replace(/\n/g,'<r');
 	}else{
-		output = output.replace(/\r/g,'').replace(/\n/g,'<br />');
+		output = output.replace(/\r/g,'').replace(/\n/g,'<br /'+'>');
 	}
 	if(metahead == "me"){
 		if(output.substr(0,1) != " ") output = " " + output;
@@ -1443,13 +1442,13 @@ function getHTMLfromSavvyCode(savvyCode, domath, author, compress){
 
 //recursive helper function that uses an undocumented feature of replace() to parse nested ">" quote tags
 function addQuotes(savvyCode,compress){
-	var content = savvyCode.replace(/([\n\r])&gt;/g,"$1").replace(/^\n|\n$/g,'').replace(/([\r\n]&gt;.*?)+[\r\n]/g,function(savvyCode){return addQuotes(savvyCode,compress);});
+	var content = savvyCode.replace(/([\n\r])&gt;/g,"$1").replace(/^\n|\n$/g,'').replace(/([\r\n]&gt;.*?)+[\r\n]/g,function(savvyCode){return addQuotes(savvyCode,compress);})+"\r";
 	if(content.replace(/\r/g,"") == ""){
-		content = "<br />";
+		content = "<br /"+">";
 	}
 	//is this a spoiler
 	if(/^[\r\n]*&lt; *.*?[\n\r]/.test(content)){
-		content = content.replace(/^[\r\n]*&lt; *(.*?)[\n\r]/,"")
+		content = content.replace(/^[\r\n]*&lt; *(.*?)[\n\r]/,"\r")
 		//this is a spoiler
 		if(compress){
 			return '\r<t' + RegExp.$1 + 't><p' + content + 'p>\r';
@@ -1819,7 +1818,7 @@ function onLoadBody(){
 	
 	//set up the infrastructure to play audio
 	if(typeof(Audio) == 'undefined'){
-		document.getElementById("dummy").innerHTML += '<bgsound id="IEsound" />';
+		document.getElementById("dummy").innerHTML += '<bgsound id="IEsound" /'+'>';
 	}else{
 		sounds["alert"] = new Audio("sounds/alert.wav");
 		sounds["error"] = new Audio("sounds/error.wav");
