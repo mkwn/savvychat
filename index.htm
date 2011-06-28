@@ -1164,8 +1164,8 @@ function recievePost(post,ignoretopics,prepend){
 		//hide author label for repeated posts by the same author
 		if(postlist.lastChild){
 			if(parsedObj.html != ""){
-				if(postlist.lastChild.childNodes[2].innerHTML == parsedObj.authortext){
-					newdiv.childNodes[2].style.display = "None";
+				if(postlist.lastChild.childNodes[1].innerHTML == parsedObj.authortext){
+					newdiv.childNodes[1].style.display = "None";
 					addClass(newdiv,"joinedattop");
 					addClass(postlist.lastChild,"joinedatbottom");
 					//newdiv.style.marginTop = "0";
@@ -1181,8 +1181,8 @@ function recievePost(post,ignoretopics,prepend){
 		//hide author label for repeated posts by the same author
 		if(postlist.firstChild){
 			if(parsedObj.html != ""){
-				if(postlist.firstChild.childNodes[2].innerHTML == parsedObj.authortext){
-					postlist.firstChild.childNodes[2].style.display = "None";
+				if(postlist.firstChild.childNodes[1].innerHTML == parsedObj.authortext){
+					postlist.firstChild.childNodes[1].style.display = "None";
 					addClass(newdiv,"joinedatbottom");
 					addClass(postlist.firstChild,"joinedattop");
 					//postlist.firstChild.style.marginTop = "0";
