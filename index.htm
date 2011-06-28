@@ -454,9 +454,7 @@ function allowSend(allow,cause){
 	document.getElementById('postbutton').disabled = false;
 }
 
-//var badChannelTimeout;
-//when the connection expires
-function onClose(){
+function refreshToken(time){
 	socket.onclose = function(){};
 	socket.onerror = function(){};
 	socket.close();
@@ -470,8 +468,8 @@ function onClose(){
 			setIcon("error.ico");
 			document.title = "! SavvyChat";
 			alerted = false;
-			displayNote("Connection error. Please [[reload SavvyChat@@javascript:location.reload();]].");
-			sendMessage('/closed', {param: 'u=' + userid + '&t=' + tokenid});
+			displayNote("Reconnect failed. Retrying in "+time+"seconds.");
+			setTimeout("refreshToken("+time*2+");",time*1000);
 			return;
 		}
 		var arr = response.split("@@")
@@ -485,7 +483,13 @@ function onClose(){
 		//displayNote("Session expired or failed. Savvychat will attempt to aquire a new connection, but possibly you may need to refresh the page.");});
 	//sendMessage('/closed');
 	allowSend(false,"error");
-	//alert("SavvyChat session expired or broke.");
+}
+
+//var badChannelTimeout;
+//when the connection expires
+function onClose(){
+	displayNote("Connection error. Savvychat is attempting to refresh your connection. If this doesn't work, please [[reload SavvyChat@@javascript:sendMessage('/closed', {param: 'u=' + userid + '&t=' + tokenid});location.reload();]].");
+	refreshToken(0)
 }
 
 function displayNote(text){
@@ -626,6 +630,7 @@ function sendPost(){
 		//worktext = RegExp.$3;
 		meta = meta.toLowerCase().replace(/\s/g,"");
 		metahead = meta.split(":")[0]
+
 		switch(metahead){
 		case "logout":
 			//logout
@@ -637,7 +642,7 @@ function sendPost(){
 			verbose = !verbose;
 			wh = 0;//force a refit
 			fitWindow();
-			return;
+			return showPreview(true);
 			break;
 		case "help":
 			//help
@@ -648,12 +653,12 @@ function sendPost(){
 			//alert tone
 			document.getElementById("alertcheck").checked = !document.getElementById("alertcheck").checked;
 			toggleAlert(document.getElementById("alertcheck"));
-			return;
+			return showPreview(true);
 			break;
 		case "mute":
 			//mute
 			mute = !mute;
-			return;
+			return showPreview(true);
 			break;
 		case "preview":
 			//preview
@@ -664,12 +669,12 @@ function sendPost(){
 		case "math":
 			//math in preview
 			mathpreview = !mathpreview;
-			return;
+			return showPreview(true);
 			break;
 		case "archive":
 			//retrieve archive
 			retrieveArchive();
-			return;
+			return showPreview(true);
 			break;
 		case "sync":
 			//sync
@@ -720,6 +725,7 @@ function sendPost(){
 		processParts(partNo, blockSize, text, enctext)
 	}
 	document.getElementById("preview").innerHTML = "";
+	//showPreview(true);
 	document.getElementById("authorpreview").innerHTML = username + ":";
 	document.getElementById("composefield").value = "";
 	allowSend(false,"post");
@@ -801,13 +807,14 @@ function sync(){
 		startquerycursor = m.cursor;
 		recieveSync(m.posts);
 		syncing = false;
-		showPreview();
+		showPreview(true);
 		if(syncInterrupt){
 			sync();
 		}
 	};
 	sendMessage('/sync', {param: 'c=' + encodeURIComponent(startquerycursor), callback: callback});
 	syncing = true;
+	showPreview(true)
 	syncInterrupt = false;
 }
 
@@ -1136,7 +1143,7 @@ function recievePost(post,ignoretopics,prepend){
 		//var escapedPost = post.content.replace(/\\/g,"\\\\").replace(/\n/g,"\\n").replace(/"/g,"\\&quot;");
 		//quoteHTML = '<a href="" onclick="autoquote(&quot;'+escapedPost+'&quot;,&quot;'+post.author+'&quot;,&quot;'+parsedDate+'&quot;);return false;" title="quote this post">'+parsedDate+'</a>';
 	//}
-	var divHTML='<div class="datelabel">'+quoteHTML+'</div> <span class="author">'+parsedObj.authortext+'</span><span class="postcontent">' + parsedObj.html + '</span>';
+	var divHTML='<div class="datelabel">'+quoteHTML+' </div><span class="author">'+parsedObj.authortext+'</span><span class="postcontent">' + parsedObj.html + '</span>';
 	var newdiv = document.createElement('div');
 	newdiv.innerHTML = divHTML;
 	newdiv.firstChild.firstChild.href = "";
@@ -1224,7 +1231,7 @@ function openHelp(){
 
 //update the content of the preview post
 var cachedText = "";
-function showPreview(){
+function showPreview(ignoreCache){
 	var composetext = document.getElementById("composefield").value;
 	if(composetext == ""){
 		allowSend(false,"empty");
@@ -1232,7 +1239,7 @@ function showPreview(){
 		allowSend(true,"empty");
 	}
 	//if(uploading) return;
-	if(cachedText == composetext) return;
+	if(!ignoreCache && cachedText == composetext) return;
 	cachedText = composetext;
 	if(!dopreview){
 		return;

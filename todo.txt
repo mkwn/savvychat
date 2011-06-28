@@ -1,4 +1,5 @@
 PRIORITY 0: DEFECTS
+james is getting freezes on savvychat load
 i keep getting connection error instead of resent token, should time this out
 I had an issue where the preview text was not inline with the authortext in the label
 onbeforeunload not firing in gadget mode
@@ -10,12 +11,12 @@ what if comet is really slow and sync finishes first? then therell be duplicates
 math in spoilers is bold for some reason, seems to be because of display:none and autobold
 ben has an opaque id for old posts
 limit topic length
-autoparse parentheses like (http://a)
 in preview, spoilers should be open by default/keep opened mode
 dont update lastonline if there's an error
 sync periodically - sometimes stuff doesn't send
 
 PRIORITY 1: IMPORTANT
+autoparse parentheses like (http://a)
 if message is long, preview less frequently to avoid lag
 clean up calls
 have tool to dump archives for searching
@@ -47,6 +48,7 @@ press up in empty textbox to get last message
 queue posts with verify instead of disabling send
 
 PRIORITY 2: COMPLICATED
+recognize and collapse conversations
 write a real parser
 allow to invite guest
 post color/display pictures - more easily identify poster
