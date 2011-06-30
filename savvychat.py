@@ -23,8 +23,8 @@ import re
 
 import traceback
 
-MAXPOSTS = 100 #max number of posts initialized
-EXTRAPOSTS = 30 #number of posts recieved when "view older" is checked.
+MAXPOSTS = 1000 #max number of posts initialized
+#EXTRAPOSTS = 30 #number of posts recieved when "view older" is checked.
 
 #http://stackoverflow.com/questions/2350454/simplest-way-to-store-a-value-in-google-app-engine-python
 class Global(db.Model):
@@ -281,12 +281,15 @@ class RetrievePage(webapp.RequestHandler):
 	def post(self):
 		#there is a request for more of the post archive
 		cursor = self.request.get('c')
+		numPosts = 20
+		if self.request.get('n'):
+			numPosts = min(int(self.request.get('n')),MAXPOSTS)
 		postsData = db.GqlQuery("SELECT * FROM Post ORDER BY date DESC").with_cursor(cursor)
 		posts = []
 		showarchive = False
 		querycursor = ""
 		for post in postsData:
-			if len(posts) == EXTRAPOSTS:
+			if len(posts) == numPosts:
 				#we are done
 				showarchive = True
 				break;

@@ -1,10 +1,15 @@
 PRIORITY 0: DEFECTS
 james is getting freezes on savvychat load
-i keep getting connection error instead of resent token, should time this out
+
+ping function to check whether connection is active, especially after disconnect
+flushtokens
+"retry now" in reconnect text
+add new commands to help
+add notify confirm for some commands
+
 I had an issue where the preview text was not inline with the authortext in the label
 onbeforeunload not firing in gadget mode
 when file is too large, error should be returned
-sync text isnt changing the second time for some reason
 perhaps i should autopost uploaded files
 perhaps i should put file upload on a different server
 what if comet is really slow and sync finishes first? then therell be duplicates

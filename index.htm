@@ -454,7 +454,13 @@ function allowSend(allow,cause){
 	document.getElementById('postbutton').disabled = false;
 }
 
+var refreshing = false;
+var refreshTimeout = null;
 function refreshToken(time){
+	refreshing = true;
+	showPreview(true);
+	allowSend(false,"error");
+	clearInterval(refreshTimeout);
 	socket.onclose = function(){};
 	socket.onerror = function(){};
 	socket.close();
@@ -462,21 +468,25 @@ function refreshToken(time){
 		if(!response){
 			if(!windowFocus&&!alerted){
 				if(!disableAlert&&!mute){
-					playAlert("error");
+					//playAlert("error");
 				}
 			}
 			setIcon("error.ico");
 			document.title = "! SavvyChat";
 			alerted = false;
-			displayNote("Reconnect failed. Retrying in "+time+"seconds.");
-			setTimeout("refreshToken("+time*2+");",time*1000);
+			displayNote("Reconnect failed. Retrying in "+time+" seconds.");
+			refreshTimeout=setTimeout("refreshToken("+Math.min(time*2,60)+");",time*1000);
 			return;
 		}
+		setIcon("favicon.ico");
+		document.title = "SavvyChat";
 		var arr = response.split("@@")
 		tokenid = arr.shift();
 		token = arr.join("@@");
 		openChannel();
 		allowSend(true,"error");
+		refreshing = false;
+		showPreview(true);
 	};
 	sendMessage('/token',{callback:callback, param: 't=' + tokenid});
 	//badChannelTimeout = setTimeout(function(){
@@ -489,7 +499,7 @@ function refreshToken(time){
 //when the connection expires
 function onClose(){
 	displayNote("Connection error. Savvychat is attempting to refresh your connection. If this doesn't work, please [[reload SavvyChat@@javascript:sendMessage('/closed', {param: 'u=' + userid + '&t=' + tokenid});location.reload();]].");
-	refreshToken(0)
+	refreshToken(1);
 }
 
 function displayNote(text){
@@ -645,7 +655,6 @@ function sendPost(){
 			return showPreview(true);
 			break;
 		case "help":
-			//help
 			openHelp();
 			return;
 			break;
@@ -656,12 +665,11 @@ function sendPost(){
 			return showPreview(true);
 			break;
 		case "mute":
-			//mute
 			mute = !mute;
 			return showPreview(true);
 			break;
 		case "preview":
-			//preview
+			//toggle preview
 			document.getElementById("previewcheck").checked = !document.getElementById("previewcheck").checked;
 			togglePreview(document.getElementById("previewcheck"));
 			return;
@@ -673,13 +681,25 @@ function sendPost(){
 			break;
 		case "archive":
 			//retrieve archive
-			retrieveArchive();
+			var numPosts = parseInt(meta.split(":")[1],10);
+			if(!numPosts) numPosts = 20;
+			retrieveArchive(numPosts);
 			return showPreview(true);
 			break;
 		case "sync":
-			//sync
-			//sendMessage("/test",{callback:function(response){displayNote(response);}})
 			sync();
+			return;
+			break;
+		case "ping":
+			ping(true);
+			return;
+			break;
+		case "refresh":
+			refreshToken();
+			return;
+			break;
+		case "flush":
+			flushTokens();
 			return;
 			break;
 		case "upload":
@@ -777,8 +797,9 @@ function processParts(partNo, blockSize, text, enctext){
 
 var retrieving = false;
 //call the server for some archive
-function retrieveArchive(){
+function retrieveArchive(numPosts){
 	if(retrieving||denyretrieve) return;
+	if(!numPosts) numPosts = 20;
 	var callback = function(response){
 		var m = JSON.parse(response);
 		document.getElementById("viewarchivetag").innerHTML='<a href="" onclick="retrieveArchive();return false;">^ view older ^</a>'
@@ -792,7 +813,7 @@ function retrieveArchive(){
 		}
 	};
 	retrieving = true;
-	sendMessage('/retrieve', {param: 'c=' + encodeURIComponent(endquerycursor), callback: callback});
+	sendMessage('/retrieve', {param: 'n=' + numPosts + '&c=' + encodeURIComponent(endquerycursor), callback: callback});
 	document.getElementById("viewarchivetag").innerHTML = "loading...";
 	//using AJAX for the reply seems marginally more reliable than COMET, but I'm not certain. Original COMET code is commented out in onMessage.
 }
@@ -816,6 +837,17 @@ function sync(){
 	syncing = true;
 	showPreview(true)
 	syncInterrupt = false;
+}
+
+var pinging = false;
+function ping(notify){
+	//send ping, recieve confirmation. Time it
+	if(notify){
+		//notify
+	}
+}
+
+function flushTokens(){
 }
 
 //process the archive
@@ -1345,7 +1377,9 @@ function getHTMLfromSavvyCode(savvyCode, domath, author, compress){
 			return {meta:'math',html:'<strong>Special command to '+str+' live previewing of math (will not send)</strong>', authortext:authortext};
 			break;
 		case "archive":
-			str = 'Special command to retrieve the last 10 posts in the archive';
+			var numPosts = parseInt(meta.split(":")[1],10);
+			if(!numPosts) numPosts = 20;
+			str = 'Special command to retrieve the last '+numPosts+' posts in the archive';
 			if(retrieving||denyretrieve)str = "Archive retrieval denied, command disabled";
 			return {meta:'archive',html:'<strong>'+str+' (will not send)</strong>', authortext:authortext};
 			break;
@@ -1353,6 +1387,20 @@ function getHTMLfromSavvyCode(savvyCode, domath, author, compress){
 			str = 'Special command to synchronize the discussion in case you failed to recieve some messages';
 			if(syncing)str = "Syncing in progress, command disabled";
 			return {meta:'sync',html:'<strong>'+str+' (will not send)</strong>', authortext:authortext};
+			break;
+		case "ping":
+			str = '<span class="strikethrough">Special command to check whether the channel is open</span>';
+			if(pinging)str = "Pinging in progress, command disabled";
+			return {meta:'ping',html:'<strong>'+str+' (will not send)</strong>', authortext:authortext};
+			break;
+		case "refresh":
+			str = 'Special command to request new channel token to refresh connection';
+			if(refreshing)str = "Refreshing in progress, command disabled";
+			return {meta:'refresh',html:'<strong>'+str+' (will not send)</strong>', authortext:authortext};
+			break;
+		case "flush":
+			str = 'Special command to clear all connections with your user ID';
+			return {meta:'flush',html:'<strong>'+str+' (will not send)</strong>', authortext:authortext};
 			break;
 		case "upload":
 			return {meta:'upload',html:'<strong>Special command to open upload dialog (will not send)</strong>', authortext:authortext};
