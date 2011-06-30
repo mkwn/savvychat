@@ -457,6 +457,7 @@ function allowSend(allow,cause){
 var refreshing = false;
 var refreshTimeout = null;
 function refreshToken(time){
+	if(!time) time = 1;
 	refreshing = true;
 	showPreview(true);
 	allowSend(false,"error");
@@ -474,7 +475,7 @@ function refreshToken(time){
 			setIcon("error.ico");
 			document.title = "! SavvyChat";
 			alerted = false;
-			displayNote("Reconnect failed. Retrying in "+time+" seconds.");
+			displayNote("Reconnect failed. Retrying in "+time+" seconds. [[Try now@@javascript:refreshToken(1)]]");
 			refreshTimeout=setTimeout("refreshToken("+Math.min(time*2,60)+");",time*1000);
 			return;
 		}
@@ -1171,11 +1172,13 @@ function recievePost(post,ignoretopics,prepend){
 		}
 	}
 	var quoteHTML = '<a>'+parsedDate+'</a>';
+	var titleHTML = "";
+	if(gadget) titleHTML = ' title="'+parsedDate+'"';
 	//if(metahead != "cont"){
 		//var escapedPost = post.content.replace(/\\/g,"\\\\").replace(/\n/g,"\\n").replace(/"/g,"\\&quot;");
 		//quoteHTML = '<a href="" onclick="autoquote(&quot;'+escapedPost+'&quot;,&quot;'+post.author+'&quot;,&quot;'+parsedDate+'&quot;);return false;" title="quote this post">'+parsedDate+'</a>';
 	//}
-	var divHTML='<div class="datelabel">'+quoteHTML+' </div><span class="author">'+parsedObj.authortext+'</span><span class="postcontent">' + parsedObj.html + '</span>';
+	var divHTML='<div class="datelabel">'+quoteHTML+' </div><span class="author"'+titleHTML+'>'+parsedObj.authortext+'</span><span class="postcontent">' + parsedObj.html + '</span>';
 	var newdiv = document.createElement('div');
 	newdiv.innerHTML = divHTML;
 	newdiv.firstChild.firstChild.href = "";
@@ -1377,7 +1380,7 @@ function getHTMLfromSavvyCode(savvyCode, domath, author, compress){
 			return {meta:'math',html:'<strong>Special command to '+str+' live previewing of math (will not send)</strong>', authortext:authortext};
 			break;
 		case "archive":
-			var numPosts = parseInt(meta.split(":")[1],10);
+			var numPosts = Math.min(parseInt(meta.split(":")[1],10),1000);
 			if(!numPosts) numPosts = 20;
 			str = 'Special command to retrieve the last '+numPosts+' posts in the archive';
 			if(retrieving||denyretrieve)str = "Archive retrieval denied, command disabled";

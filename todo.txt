@@ -1,12 +1,9 @@
 PRIORITY 0: DEFECTS
 james is getting freezes on savvychat load
-
 ping function to check whether connection is active, especially after disconnect
 flushtokens
-"retry now" in reconnect text
 add new commands to help
 add notify confirm for some commands
-
 I had an issue where the preview text was not inline with the authortext in the label
 onbeforeunload not firing in gadget mode
 when file is too large, error should be returned
@@ -19,8 +16,10 @@ limit topic length
 in preview, spoilers should be open by default/keep opened mode
 dont update lastonline if there's an error
 sync periodically - sometimes stuff doesn't send
+whitelist should be editable in the dashboard
 
 PRIORITY 1: IMPORTANT
+dump logs every month
 autoparse parentheses like (http://a)
 if message is long, preview less frequently to avoid lag
 clean up calls
