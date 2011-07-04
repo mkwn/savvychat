@@ -18,16 +18,6 @@ h3,h4{
 margin-bottom: 5px;
 }
 
-hr{
-color: #EEE;
-background-color: #EEE;
-height: 3px;
-border: None;
-margin-left: 20px;
-margin-right: 20px;
-margin-bottom: 0;
-}
-
 #preview .code{
 background-color: #BBF;
 }
@@ -804,9 +794,9 @@ function retrieveArchive(numPosts){
 	var callback = function(response){
 		var m = JSON.parse(response);
 		document.getElementById("viewarchivetag").innerHTML='<a href="" onclick="retrieveArchive();return false;">^ view older ^</a>'
-		showPreview();
 		recieveArchive(m.posts);
 		retrieving = false;
+		showPreview(true);
 		endquerycursor = m.cursor;
 		if(!m.showarchive){
 			document.getElementById("viewarchivetag").style.display = "None";
@@ -814,6 +804,7 @@ function retrieveArchive(numPosts){
 		}
 	};
 	retrieving = true;
+	showPreview(true);
 	sendMessage('/retrieve', {param: 'n=' + numPosts + '&c=' + encodeURIComponent(endquerycursor), callback: callback});
 	document.getElementById("viewarchivetag").innerHTML = "loading...";
 	//using AJAX for the reply seems marginally more reliable than COMET, but I'm not certain. Original COMET code is commented out in onMessage.
