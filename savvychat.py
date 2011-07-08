@@ -77,6 +77,14 @@ def fetchTokens():
 		tokens = tokens + chatuser.tokens
 	return tokens
 
+def delToken(chatuser, idx):
+	try:
+		del chatuser.lastrefreshlist[idx]
+	except IndexError: pass
+	try:
+		del chatuser.tokens[idx]
+	except IndexError: pass
+
 def broadcast(post):
 	#send a message to everyone who is online
 	tokens = fetchTokens()
@@ -155,8 +163,7 @@ def resolveStragglers():
 		for idx, lastrefresh in enumerate(chatuser.lastrefreshlist):
 			if (now-lastrefresh).seconds > 60*60*2+120:
 				#expired
-				del chatuser.lastrefreshlist[idx]
-				del chatuser.tokens[idx]
+				delToken(chatuser, idx)
 				expired = True
 		if expired:
 			chatuser.put()
@@ -278,8 +285,8 @@ class CallPage(webapp.RequestHandler):
 			decompressHTML(self.request.get('h')))
 			
 class RetrievePage(webapp.RequestHandler):
+	#there is a request for more of the post archive
 	def post(self):
-		#there is a request for more of the post archive
 		cursor = self.request.get('c')
 		numPosts = 20
 		if self.request.get('n'):
@@ -301,8 +308,8 @@ class RetrievePage(webapp.RequestHandler):
 		#channel.send_message(self.request.get('t'), message)
 
 class SyncPage(webapp.RequestHandler):
+	#there is a request for a sync since last time
 	def post(self):
-		#there is a request for a sync since last time
 		endcursor = self.request.get('c')
 		if endcursor == "":
 			endcursor = None
@@ -323,9 +330,9 @@ class SyncPage(webapp.RequestHandler):
 		#channel.send_message(self.request.get('t'), message)
 		
 class TokenPage(webapp.RequestHandler):
+	#this creates a new token, for when an old one expires
 	def post(self):
-		#called when connection expires
-		#remove old token in db
+		#first, authenticate:
 		user = users.get_current_user()
 		if not user:
 			return
@@ -333,9 +340,14 @@ class TokenPage(webapp.RequestHandler):
 		chatuser = getUserFromId(userid)
 		if not chatuser:
 			return
-		tokenindex = chatuser.tokens.index(self.request.get('t'))
-		del chatuser.tokens[tokenindex]
-		del chatuser.lastrefreshlist[tokenindex]
+
+		#next, remove old token in db
+		try:
+			tokenindex = chatuser.tokens.index(self.request.get('t'))
+			delToken(chatuser, tokenindex)
+		except ValueError:
+			#token has been removed already
+			pass
 
 		#get new token
 		suffix = 0
@@ -346,29 +358,32 @@ class TokenPage(webapp.RequestHandler):
 			suffix = suffix + 1
 		token = channel.create_channel(tokenid)
 		
-		#the following would ideally be in openedpage, but it creates the possibility of duplicate tokens
-		#duplicate
+		#save changes to db
 		chatuser.tokens = chatuser.tokens + [tokenid]
 		chatuser.lastrefreshlist = chatuser.lastrefreshlist + [datetime.utcnow()]
 		chatuser.lastonline = datetime.utcnow()
 		chatuser.put()
 		
+		#serve token
 		self.response.out.write(tokenid + '@@' + token)
 		
 class ClosedPage(webapp.RequestHandler):
+	#This is for when someone disconnects, to get rid of their token
 	def post(self):
-		#called when someone disconnects
-		#remove token
 		chatuser = getUserFromId(self.request.get('u'))
 		tokenindex = chatuser.tokens.index(self.request.get('t'))
-		del chatuser.tokens[tokenindex]
-		del chatuser.lastrefreshlist[tokenindex]
+		try:
+			tokenindex = chatuser.tokens.index(self.request.get('t'))
+			delToken(chatuser, tokenindex)
+		except ValueError:
+			#token has been removed already
+			pass
 		chatuser.lastonline = datetime.utcnow()
 		chatuser.put()
 		
 class TonePage(webapp.RequestHandler):
+	#for when someone changes the alert tone settings
 	def post(self):
-		#called when someone changes the alert tone settings
 		#remove token
 		user = users.get_current_user()
 		if not user:
@@ -386,7 +401,7 @@ class TonePage(webapp.RequestHandler):
 		
 class MainPage(webapp.RequestHandler):
 	def get(self):
-		#authenticate, create a token and render the main page
+		#authenticate
 		user = users.get_current_user()
 		if not user:
 			#not logged in, redirect to login page

@@ -1,5 +1,8 @@
 PRIORITY 0: DEFECTS
-james is getting freezes on savvychat load
+set icon before page load?
+james is getting freezes on math load
+reconnect code still not working http://stackoverflow.com/questions/6546932/refreshing-the-token-with-the-gae-channel-api
+for some reason refreshtoken seems to be called every time logon
 ping function to check whether connection is active, especially after disconnect
 flushtokens
 add new commands to help
@@ -19,6 +22,7 @@ sync periodically - sometimes stuff doesn't send
 whitelist should be editable in the dashboard
 
 PRIORITY 1: IMPORTANT
+all options should save
 dump logs every month
 autoparse parentheses like (http://a)
 if message is long, preview less frequently to avoid lag
