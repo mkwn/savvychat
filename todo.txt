@@ -18,7 +18,6 @@ limit topic length
 in preview, spoilers should be open by default/keep opened mode
 dont update lastonline if there's an error
 sync periodically - sometimes stuff doesn't send
-whitelist should be editable in the dashboard
 
 PRIORITY 1: IMPORTANT
 all options should save

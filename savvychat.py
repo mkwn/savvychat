@@ -67,6 +67,11 @@ class File(db.Model):
 	#name = db.StringProperty()
 	data = db.BlobProperty()
 
+class Whiteuser(db.Model):
+	#whitelisted users
+	email = db.EmailProperty()
+	name = db.StringProperty()
+
 def fetchTokens():
 	#tokens = memcache.get("tokens")
 	#if not tokens:
@@ -248,6 +253,63 @@ def doPost(content, author=None):
 	except:
 		pass
 	#call(post.recipients,authoruser.name,contenttext)
+
+def dump(self):
+	#make a dump of all posts
+	#get start time
+	try:
+		startInt = int(Global.get("lastDump"))
+	except ValueError:
+		startInt = int(time.mktime(db.GqlQuery("SELECT * FROM Post ORDER BY date ASC").get().date.timetuple()))
+	startArg = self.request.get('s')
+	if startArg:
+		startInt = int(startArg)
+	startDate = datetime.fromtimestamp(startInt)
+	
+	#get end time
+	endInt = int(time.mktime(datetime.utcnow().timetuple()))
+	endArg = self.request.get('e')
+	if endArg:
+		endInt = int(endArg)
+	if endInt - startInt > 1000000 or endInt <  startInt:
+		#request will probably time out, we need to cut the interval
+		endInt = startInt + 1000000
+	endDate = datetime.fromtimestamp(endInt)
+
+	outString = "This is a dump of all posts from " + str(startDate) + " to " + str(endDate) + ".\n(UNIX timestamps " + str(startInt) + "-" + str(endInt) + ")."
+
+	#fetch posts
+	postsData = db.GqlQuery("SELECT * FROM Post WHERE date > DATETIME('" + str(startDate) + "') ORDER BY date ASC")
+	for post in postsData:
+		if post.date > endDate:
+			break
+		dateString = str(datetime.fromtimestamp(int(time.mktime(post.date.timetuple()))))
+		try:
+			authorString = getUserFromId(post.author).name
+		except AttributeError:
+			authorString = post.author
+		outString += "\n\n" + authorString + " @ " + dateString + ":\n" + post.content
+	self.response.headers['Content-Type'] = "text/plain"
+	self.response.out.write(outString)
+	Global.set("lastDump", str(endInt))
+
+def initWhite(self):
+	whitelistData = open("whitelist.txt")
+	whitelist = whitelistData.readlines()
+	whitelistData.close()
+	for emailData in whitelist:
+		if emailData.rstrip() == "":
+			#end of whitelist
+			break
+		email, name = tuple(emailData.rstrip().split(" "))
+		whiteuser = db.GqlQuery("SELECT * FROM Whiteuser WHERE email='" + email + "'").get()
+		if whiteuser: continue
+		whiteuser = Whiteuser()
+		whiteuser.name = name
+		whiteuser.email = email
+		whiteuser.put()
+	return self.response.out.write("done")
+
 class PostPage(webapp.RequestHandler):
 	def post(self):
 		#called on recieving a post
@@ -410,7 +472,6 @@ class MainPage(webapp.RequestHandler):
 				path = '/?gadget=true'
 			return self.redirect(users.create_login_url(path))
 		userid = user.user_id()
-		
 		logouturl = users.create_logout_url(self.request.uri)
 		
 		#check if userid is in DB
@@ -421,24 +482,18 @@ class MainPage(webapp.RequestHandler):
 		else:
 			#not in DB
 			#check against email whitelist
-			whitelistData = open("whitelist.txt")
-			whitelist = whitelistData.readlines()
-			whitelistData.close()
-			for emailData in whitelist + [""]:
-				if emailData.rstrip() == "":
-					#not in whitelist
-					self.response.out.write(template.render('deny.htm', {'logouturl':logouturl}))
-					return
-				email, name = tuple(emailData.rstrip().split(" "))
-				if email == user.email().lower():
-					#user is in whitelist
-					chatuser = Chatuser()
-					chatuser.userid = userid
-					chatuser.name = name
-					chatuser.email = email
-					#chatuser.put()
-					chatuser.lastonline = datetime(2000,1,1) #so we load every message for them
-					break
+			whiteuser = db.GqlQuery("SELECT * FROM Whiteuser WHERE email='" + user.email().lower() + "'").get()
+			if whiteuser:
+				#user is in whitelist
+				chatuser = Chatuser()
+				chatuser.userid = userid
+				chatuser.name = whiteuser.name
+				chatuser.email = whiteuser.email
+				#chatuser.put()
+				chatuser.lastonline = datetime(2000,1,1) #so we load every message for them
+			else:
+				#not in whitelist
+				return self.response.out.write(template.render('deny.htm', {'logouturl':logouturl}))
 		
 		#get unread posts
 		postsData = db.GqlQuery("SELECT * FROM Post ORDER BY date DESC")
@@ -528,8 +583,8 @@ class MainPage(webapp.RequestHandler):
 							'disableMath':disableMath}
 		self.response.out.write(template.render('index.htm', template_values))
 
-class DumpPage(webapp.RequestHandler):
-	#make a dump of all posts
+class AdminPage(webapp.RequestHandler):
+	#special admin functions
 	def get(self):
 		#authenticate
 		user = users.get_current_user()
@@ -538,43 +593,14 @@ class DumpPage(webapp.RequestHandler):
 			return self.redirect(users.create_login_url('/'))
 		if user.email().lower() != "mattk210@gmail.com":
 			return self.redirect('/')
-		
-		#get start time
-		try:
-			startInt = int(Global.get("lastDump"))
-		except ValueError:
-			startInt = int(time.mktime(db.GqlQuery("SELECT * FROM Post ORDER BY date ASC").get().date.timetuple()))
-		startArg = self.request.get('s')
-		if startArg:
-			startInt = int(startArg)
-		startDate = datetime.fromtimestamp(startInt)
-		
-		#get end time
-		endInt = int(time.mktime(datetime.utcnow().timetuple()))
-		endArg = self.request.get('e')
-		if endArg:
-			endInt = int(endArg)
-		if endInt - startInt > 1000000 or endInt <  startInt:
-			#request will probably time out, we need to cut the interval
-			endInt = startInt + 1000000
-		endDate = datetime.fromtimestamp(endInt)
 
-		outString = "This is a dump of all posts from " + str(startDate) + " to " + str(endDate) + ".\n(UNIX timestamps " + str(startInt) + "-" + str(endInt) + ")."
-
-		#fetch posts
-		postsData = db.GqlQuery("SELECT * FROM Post WHERE date > DATETIME('" + str(startDate) + "') ORDER BY date ASC")
-		for post in postsData:
-			if post.date > endDate:
-				break
-			dateString = str(datetime.fromtimestamp(int(time.mktime(post.date.timetuple()))))
-			try:
-				authorString = getUserFromId(post.author).name
-			except AttributeError:
-				authorString = post.author
-			outString += "\n\n" + authorString + " @ " + dateString + ":\n" + post.content
-		self.response.headers['Content-Type'] = "text/plain"
-		self.response.out.write(outString)
-		Global.set("lastDump", str(endInt))
+		typeString = self.request.get('type')
+		if not typeString:
+			return self.response.out.write('<a href="?type=dump">Dump posts</a><br /><a href="?type=white">Initialize whitelist</a>')
+		if typeString == "dump":
+			return dump(self)
+		if typeString == "white":
+			return initWhite(self)
 
 class UploadPage(webapp.RequestHandler):
 	def post(self):
@@ -616,7 +642,7 @@ application = webapp.WSGIApplication([
 									('/tone', TonePage),
 									('/token', TokenPage),
 									('/upload', UploadPage),
-									('/dump', DumpPage),
+									('/admin', AdminPage),
 									('/download/(\d+)/(.*)', DownloadHandler),
 									('/closed', ClosedPage)])
 

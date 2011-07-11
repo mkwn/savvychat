@@ -1166,14 +1166,15 @@ function recievePost(post,ignoretopics,prepend){
 	}
 	var quoteHTML = '<a>'+parsedDate+'</a>';
 	var titleHTML = "";
-	if(gadget) titleHTML = ' title="'+parsedDate+'"';
+	//if(gadget) titleHTML = ' title="'+parsedDate+'"';
 	//if(metahead != "cont"){
 		//var escapedPost = post.content.replace(/\\/g,"\\\\").replace(/\n/g,"\\n").replace(/"/g,"\\&quot;");
 		//quoteHTML = '<a href="" onclick="autoquote(&quot;'+escapedPost+'&quot;,&quot;'+post.author+'&quot;,&quot;'+parsedDate+'&quot;);return false;" title="quote this post">'+parsedDate+'</a>';
 	//}
-	var divHTML='<div class="datelabel">'+quoteHTML+' </div><span class="author"'+titleHTML+'>'+parsedObj.authortext+'</span><span class="postcontent">' + parsedObj.html + '</span>';
+	var divHTML='<div class="datelabel">'+quoteHTML+' </div><span class="author">'+parsedObj.authortext+'</span><span class="postcontent">' + parsedObj.html + '</span>';
 	var newdiv = document.createElement('div');
 	newdiv.innerHTML = divHTML;
+	if(gadget) newdiv.title = parsedDate
 	newdiv.firstChild.firstChild.href = "";
 	newdiv.firstChild.firstChild.title = "quote this post";
 	newdiv.firstChild.firstChild.onclick = function(){
