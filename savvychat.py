@@ -528,6 +528,54 @@ class MainPage(webapp.RequestHandler):
 							'disableMath':disableMath}
 		self.response.out.write(template.render('index.htm', template_values))
 
+class DumpPage(webapp.RequestHandler):
+	#make a dump of all posts
+	def get(self):
+		#authenticate
+		user = users.get_current_user()
+		if not user:
+			#not logged in, redirect to login page
+			return self.redirect(users.create_login_url('/'))
+		if user.email().lower() != "mattk210@gmail.com":
+			return self.redirect('/')
+		
+		#get start time
+		try:
+			startInt = int(Global.get("lastDump"))
+		except ValueError:
+			startInt = int(time.mktime(db.GqlQuery("SELECT * FROM Post ORDER BY date ASC").get().date.timetuple()))
+		startArg = self.request.get('s')
+		if startArg:
+			startInt = int(startArg)
+		startDate = datetime.fromtimestamp(startInt)
+		
+		#get end time
+		endInt = int(time.mktime(datetime.utcnow().timetuple()))
+		endArg = self.request.get('e')
+		if endArg:
+			endInt = int(endArg)
+		if endInt - startInt > 1000000 or endInt <  startInt:
+			#request will probably time out, we need to cut the interval
+			endInt = startInt + 1000000
+		endDate = datetime.fromtimestamp(endInt)
+
+		outString = "This is a dump of all posts from " + str(startDate) + " to " + str(endDate) + ".\n(UNIX timestamps " + str(startInt) + "-" + str(endInt) + ")."
+
+		#fetch posts
+		postsData = db.GqlQuery("SELECT * FROM Post WHERE date > DATETIME('" + str(startDate) + "') ORDER BY date ASC")
+		for post in postsData:
+			if post.date > endDate:
+				break
+			dateString = str(datetime.fromtimestamp(int(time.mktime(post.date.timetuple()))))
+			try:
+				authorString = getUserFromId(post.author).name
+			except AttributeError:
+				authorString = post.author
+			outString += "\n\n" + authorString + " @ " + dateString + ":\n" + post.content
+		self.response.headers['Content-Type'] = "text/plain"
+		self.response.out.write(outString)
+		Global.set("lastDump", str(endInt))
+
 class UploadPage(webapp.RequestHandler):
 	def post(self):
 		fileobj = self.request.POST["file"]
@@ -559,7 +607,6 @@ class DownloadHandler(webapp.RequestHandler):
 		self.response.headers['Content-Type'] = file.type
 		self.response.out.write(file.data)
 		
-		
 application = webapp.WSGIApplication([
 									('/', MainPage),
 									('/post', PostPage),
@@ -569,6 +616,7 @@ application = webapp.WSGIApplication([
 									('/tone', TonePage),
 									('/token', TokenPage),
 									('/upload', UploadPage),
+									('/dump', DumpPage),
 									('/download/(\d+)/(.*)', DownloadHandler),
 									('/closed', ClosedPage)])
 

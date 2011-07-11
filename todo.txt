@@ -1,19 +1,18 @@
 PRIORITY 0: DEFECTS
 set icon before page load?
+consider implications of deadline error
 james is getting freezes on math load
-reconnect code still not working http://stackoverflow.com/questions/6546932/refreshing-the-token-with-the-gae-channel-api
-for some reason refreshtoken seems to be called every time logon
 ping function to check whether connection is active, especially after disconnect
 flushtokens
-add new commands to help
 add notify confirm for some commands
 I had an issue where the preview text was not inline with the authortext in the label
+gadget not working for damien
 onbeforeunload not firing in gadget mode
 when file is too large, error should be returned
-perhaps i should autopost uploaded files
 perhaps i should put file upload on a different server
 what if comet is really slow and sync finishes first? then therell be duplicates
 math in spoilers is bold for some reason, seems to be because of display:none and autobold
+math is using image fonts in gadget
 ben has an opaque id for old posts
 limit topic length
 in preview, spoilers should be open by default/keep opened mode
@@ -23,7 +22,7 @@ whitelist should be editable in the dashboard
 
 PRIORITY 1: IMPORTANT
 all options should save
-dump logs every month
+email a log every day?
 autoparse parentheses like (http://a)
 if message is long, preview less frequently to avoid lag
 clean up calls
