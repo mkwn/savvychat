@@ -402,15 +402,31 @@ function sendMessage(path, opt){
 		var xhr = new XMLHttpRequest();
 		xhr.open('POST', path, true);
 		xhr.send();
+		var abort = function(){
+			xhr.abort();
+			if(opt && opt.abort){
+				opt.abort();
+			}else{
+				onClose();
+			}
+		};
+		var AJAXTimeout = setTimeout(abort, 10*1000);
 		xhr.onreadystatechange = function(){
 			if(xhr.readyState == 4){
+				clearTimeout(AJAXTimeout);
 				xhr.onreadystatechange = function(){};
 				if(opt && opt.callback){
+					if(!xhr.responseText) return abort();
 					opt.callback(xhr.responseText);
 				}
 			}
 		};
 		return xhr;
+}
+
+function closeMessage(){
+	var errorparam = refreshing ? '&e=true' : '';
+	sendMessage('/closed', {param: 'u=' + userid + '&t=' + tokenid + errorparam});
 }
 
 //check the message is not too long
@@ -428,9 +444,13 @@ function validateMessage(path, opt){
 }
 
 //on establishing a connection
+var checkTimeout = null;
 function onOpen(){
 	//sendMessage('/opened');
 	sync();
+	ping();
+	clearTimeout(checkTimeout);
+	checkTimeout = setTimeout("ping(false);",5*60*1000);
 }
 var allowance = {};
 function allowSend(allow,cause){
@@ -446,6 +466,7 @@ function allowSend(allow,cause){
 	document.getElementById('postbutton').disabled = false;
 }
 
+var failNotify = [];
 var refreshing = false;
 var refreshTimeout = null;
 function refreshToken(time){
@@ -468,7 +489,8 @@ function refreshToken(time){
 			document.title = "! SavvyChat";
 			alerted = false;
 			displayNote("Reconnect failed. Retrying in "+time+" seconds. [[Try now@@javascript:refreshToken(1)]]");
-			refreshTimeout=setTimeout("refreshToken("+Math.min(time*2,60)+");",time*1000);
+			clearTimeout(refreshTimeout)
+			refreshTimeout = setTimeout("refreshToken("+Math.min(time*2,60)+");",time*1000);
 			return;
 		}
 		setIcon("favicon.ico");
@@ -478,10 +500,13 @@ function refreshToken(time){
 		token = arr.join("@@");
 		openChannel();
 		allowSend(true,"error");
+		ping(false);
+		clearTimeout(checkTimeout);
+		checkTimeout = setTimeout("ping(false);",5*60*1000);
 		refreshing = false;
 		showPreview(true);
 	};
-	sendMessage('/token',{callback:callback, param: 't=' + tokenid});
+	sendMessage('/token',{callback:callback, param: 't=' + tokenid, abort:callback});
 	//badChannelTimeout = setTimeout(function(){
 		//displayNote("Session expired or failed. Savvychat will attempt to aquire a new connection, but possibly you may need to refresh the page.");});
 	//sendMessage('/closed');
@@ -491,7 +516,11 @@ function refreshToken(time){
 //var badChannelTimeout;
 //when the connection expires
 function onClose(){
-	displayNote("Connection error. Savvychat is attempting to refresh your connection. If this doesn't work, please [[reload SavvyChat@@javascript:sendMessage('/closed', {param: 'u=' + userid + '&t=' + tokenid});location.reload();]].");
+	{% if suppressErrors %}return;{% endif %}
+	clearTimeout(expectTimeout);
+	clearTimeout(checkTimeout);
+	if(refreshing) return;
+	displayNote("Connection error. Savvychat is attempting to refresh your connection. If this doesn't work, please [[reload SavvyChat@@javascript:closeMessage();location.reload();]].");
 	refreshToken(1);
 }
 
@@ -577,6 +606,12 @@ function gotCalled(post){
 var alerted = false;
 //on recieving any message from the server
 function onMessage(message){
+
+	//every 5 minutes we should try a ping
+	clearTimeout(checkTimeout);
+	checkTimeout = setTimeout("ping(false);",5*60*1000);
+	clearTimeout(expectTimeout);
+	
 	var m = JSON.parse(message.data);
 	if(m.content){
 		if(syncing){
@@ -602,6 +637,15 @@ function onMessage(message){
 		}
 		return;
 	}
+	if(m.ping){
+		if(notifyPing){
+			d = new Date();
+			note = "Successful ping. Latency was " + (d.getTime()-pingStart) + "ms.";
+			displayNote(note);
+		}
+		pinging = false;
+		showPreview(true);
+	}
 	/*if(m.verify){
 		//this was a verification
 		clearTimeout(badChannelTimeout);
@@ -618,13 +662,14 @@ function onMessage(message){
 }
 
 function logout(){
-	sendMessage('/closed', {param: 'u=' + userid + '&t=' + tokenid});
+	closeMessage();
 	location.href="{{ logouturl }}";
 }
 
+var backupText = "";
 //send a new post to the server
 function sendPost(){
-	var text = document.getElementById("composefield").value.replace(/\r/g,"");
+	text = document.getElementById("composefield").value.replace(/\r/g,"");
 	//get meta in case it's an option, in that case we want to set the option and not send
 	var meta = "";
 	var metahead;
@@ -710,6 +755,14 @@ function sendPost(){
 		//i should actually queue here
 		allowSend(true,"post");
 	};
+
+	var abort = function(){
+		var note = 'Your post failed to send:\n\n`'+backupText.replace(/`/g,"``")+"`";
+		displayNote(note);
+		failNotify.push(note);
+		onClose();
+	};
+
 	var enctext = encodeURIComponent(text);
 	
 	if(metahead == "call"){
@@ -722,10 +775,17 @@ function sendPost(){
 		}
 	}
 	
-	if (sendMessage('/post', {param: 'p=' + enctext, callback: callback})){
+	if (sendMessage('/post', {param: 'p=' + enctext, callback: callback, abort: abort})){
 		//yay
 		if(metahead == "call"){
 			//send html version for email
+			abort = function(){
+				var note = 'Call email failed to send for some reason.';
+				displayNote(note);
+				failNotify.push(note);
+				onClose();
+				onClose();
+			};
 			sendMessage('/call', {param: 'h=' + enchtml + '&r=' + encrec});
 		}
 	}else{
@@ -737,9 +797,12 @@ function sendPost(){
 		var blockSize = enctext.length - excess; //i don't want to hardcode it in case i change something in sendMessage
 		processParts(partNo, blockSize, text, enctext)
 	}
+	clearTimeout(expectTimeout);
+	expectTimeout = setTimeout("onClose();",10*1000);
 	document.getElementById("preview").innerHTML = "";
 	//showPreview(true);
 	document.getElementById("authorpreview").innerHTML = username + ":";
+	backupText = document.getElementById("composefield").value;
 	document.getElementById("composefield").value = "";
 	allowSend(false,"post");
 	//recievePost({content:document.getElementById("composefield").value,author:username,date:"1/3/11, 13:30 EST"});
@@ -785,7 +848,7 @@ function processParts(partNo, blockSize, text, enctext){
 		};
 		postcontent = encodeURIComponent("|cont:" + (partNo-1) + ",0|") + part
 	}
-	sendMessage('/post', {param: 'p=' + postcontent, callback: callback});
+	sendMessage('/post', {param: 'p=' + postcontent, callback: callback, abort: abort});
 }
 
 var retrieving = false;
@@ -805,9 +868,17 @@ function retrieveArchive(numPosts){
 			denyretrieve = true;
 		}
 	};
+
+	var abort = function(){
+		document.getElementById("viewarchivetag").innerHTML='<a href="" onclick="retrieveArchive();return false;">^ Error! Try again? ^</a>'
+		retrieving = false;
+		showPreview(true);
+		onClose();
+	};
+
 	retrieving = true;
 	showPreview(true);
-	sendMessage('/retrieve', {param: 'n=' + numPosts + '&c=' + encodeURIComponent(endquerycursor), callback: callback});
+	sendMessage('/retrieve', {param: 'n=' + numPosts + '&c=' + encodeURIComponent(endquerycursor), callback: callback, abort: abort});
 	document.getElementById("viewarchivetag").innerHTML = "loading...";
 	//using AJAX for the reply seems marginally more reliable than COMET, but I'm not certain. Original COMET code is commented out in onMessage.
 }
@@ -822,6 +893,10 @@ function sync(){
 		startquerycursor = m.cursor;
 		recieveSync(m.posts);
 		syncing = false;
+		for(note in failNotify){
+			displayNote(failNotify[note])
+		}
+		failNotify = [];
 		showPreview(true);
 		if(syncInterrupt){
 			sync();
@@ -833,9 +908,28 @@ function sync(){
 	syncInterrupt = false;
 }
 
+var expectTimeout = null;
 var pinging = false;
+var notifyPing = false;
+var pingStart;
 function ping(notify){
+	notifyPing = notify;
+	if(pinging) return;
+	pinging = true;
+	showPreview(true);
 	//send ping, recieve confirmation. Time it
+	var callback = function(response){};
+	var abort = function(response){
+		var note = 'Ping failed.';
+		displayNote(note);
+		failNotify.push(note);
+		onClose();
+	};
+	sendMessage('/ping', {param: 't=' + tokenid, abort:abort, callback:callback});
+	d = new Date();
+	pingStart = d.getTime();
+	clearTimeout(expectTimeout);
+	expectTimeout = setTimeout("onClose();",10*1000);
 	if(notify){
 		//notify
 	}
@@ -911,11 +1005,11 @@ function validateFile(){
 
 //helper function since we require to hash the 3 different escaping tags in both autoquote() and getHTMLfromSavvyCode()
 function hashstuff(text,codehash,mathhash,linkhashname,linkhashurl){
-	var worktext = text;
+	var worktext = text.replace(/``/g,"$\r$").replace(/`/g,"``").replace(/\$\r\$/g,"\r`\r");//double backtick escapes
 	var output = "";
 	while(1){
 		//get the first occurrence of an escape tag, hash that away and keep going
-		var codeparts = worktext.split("`");
+		var codeparts = worktext.split("``");
 		var mathparts = worktext.split("$$");
 		var linkparts = worktext.split("[[");
 		
@@ -927,10 +1021,10 @@ function hashstuff(text,codehash,mathhash,linkhashname,linkhashurl){
 		
 		var firstIndex = Math.min(codeparts[0].length, mathparts[0].length, linkparts[0].length);
 		if(codeparts[0].length == firstIndex){
-			output += codeparts.shift()+"`";
+			output += codeparts.shift()+"``";
 			//the carriage return is stripped later so we can use it to ensure tags aren't misinterpreted when decoding
-			codehash.push(codeparts.shift().replace(/\$\$/g,"$\r$\r").replace(/\[\[/g,"[\r[\r"));
-			worktext = codeparts.join("`");
+			codehash.push(codeparts.shift().replace(/\$\$/g,"$\r$\r").replace(/\[\[/g,"[\r[\r").replace(/\r\r\r/g,"\r`\r"));
+			worktext = codeparts.join("``");
 		}else if(linkparts[0].length == firstIndex){
 			output += linkparts.shift()+"[[";
 			var remainder = linkparts.join("[[");
@@ -954,7 +1048,7 @@ function hashstuff(text,codehash,mathhash,linkhashname,linkhashurl){
 			worktext = mathparts.join("$$");
 		}
 	}
-	return output;
+	return output.replace(/\r`\r/g,"`////");
 }
 
 function formatQuote(content){
@@ -977,7 +1071,9 @@ function formatQuote(content){
 	var linkhashurl = [];
 	
 	var output = hashstuff(worktext,codehash,mathhash,linkhashname,linkhashurl)
-	
+
+	//put back escaped backticks
+	output = output.replace(/`\/\/\/\//g,"`\r`\r");
 	//add quote tags
 	output = ">" + output.replace(/\n/g,"\n>");
 	
@@ -987,8 +1083,8 @@ function formatQuote(content){
 	output = output.replace(/__([\s\S]*?)$/,'__$1__');
 	
 	//put back code
-	codeparts = output.split("`");
-	output = interleave(codeparts,codehash,'`','`','`','`')
+	codeparts = output.split("``");
+	output = interleave(codeparts,codehash,'`','`','`','`');
 	//put back text part of links
 	linkparts = output.split("[[");
 	output = interleave(linkparts,linkhashname,'\r[\r[\r','@@[[]]','\r[\r[\r','@@[[]]');
@@ -1274,10 +1370,28 @@ function showPreview(ignoreCache){
 		return;
 	}
 	
+	var previewQuoteDisplay = [];
+	//note which spoilers are open
+	var quotes = document.getElementById("preview").getElementsByTagName("blockquote")
+	for(var quote in quotes){
+		if(quotes[quote].className == "spoiler"){
+			previewQuoteDisplay.push(quotes[quote].childNodes[1].style.display == "block");
+		}
+	}
+
 	var parsedObj = getHTMLfromSavvyCode(composetext, mathpreview, username);
 	
 	document.getElementById("preview").innerHTML = parsedObj.html;
 	document.getElementById("authorpreview").innerHTML = parsedObj.authortext;
+
+	//restore mode of spoilers
+	var quotes = document.getElementById("preview").getElementsByTagName("blockquote")
+	for(var quote in quotes){
+		if(quotes[quote].className == "spoiler"){
+			quotes[quote].childNodes[1].style.display = previewQuoteDisplay.shift() ? "block" : "none";
+		}
+	}
+
 	if(mathpreview){
 		MJQT("preview");
 	}
@@ -1386,7 +1500,7 @@ function getHTMLfromSavvyCode(savvyCode, domath, author, compress){
 			return {meta:'sync',html:'<strong>'+str+' (will not send)</strong>', authortext:authortext};
 			break;
 		case "ping":
-			str = '<span class="strikethrough">Special command to check whether the channel is open</span>';
+			str = 'Special command to check whether the channel is open';
 			if(pinging)str = "Pinging in progress, command disabled";
 			return {meta:'ping',html:'<strong>'+str+' (will not send)</strong>', authortext:authortext};
 			break;
@@ -1429,6 +1543,11 @@ function getHTMLfromSavvyCode(savvyCode, domath, author, compress){
 		itags = '<i$1i>';
 		stags = '<s$1s>';
 	}
+	
+	//output = output.replace(/\*\*\*\*/g,"");
+	//output = output.replace(/\/\/\/\//g,"");
+	//output = output.replace(/____/g,"");
+
 	output = output.replace(/\*\*([\s\S]*?)\*\*/g,btags).replace(/\*\*([\s\S]*?)$/,btags);
 	output = output.replace(/\/\/([\s\S]*?)\/\//g,itags).replace(/\/\/([\s\S]*?)$/,itags)
 	output = output.replace(/__([\s\S]*?)__/g,stags).replace(/__([\s\S]*?)$/,stags);
@@ -1463,7 +1582,7 @@ function getHTMLfromSavvyCode(savvyCode, domath, author, compress){
 	
 	//put back code
 	if(multiline) output = "\r" + output + "\r";
-	codeparts = output.split("`");
+	codeparts = output.split("``");
 	output = interleave(codeparts,codehash,citags[0],citags[1],cbtags[0],cbtags[1]);
 	
 	//put back text part of links
@@ -1478,12 +1597,24 @@ function getHTMLfromSavvyCode(savvyCode, domath, author, compress){
 	if(multiline) output = "\r" + output + "\r";
 	mathparts = output.split("$$");
 	output = interleave(mathparts, mathhash,mitags[0],mitags[1],mbtags[0],mbtags[1]);
-	
+
+	output = output.replace(/\r/g,'');
+	//order escaped backticks
+	if(compress){
+		while(output.indexOf('`<ii><c') >= 0){
+			output = output.replace(/`<ii><c/g,'<c`');
+		}
+	}else{
+		while(output.indexOf('`<em></em><span class="code') >= 0){
+			output = output.replace(/`<em><\/em><span class="code(.+?)>/g,'<span class="code$1>`');
+		}
+	}
+
 	//add newlines
 	if(compress){
-		output = output.replace(/\r/g,'').replace(/\n/g,'<r');
+		output = output.replace(/\n/g,'<r');
 	}else{
-		output = output.replace(/\r/g,'').replace(/\n/g,'<br /'+'>');
+		output = output.replace(/\n/g,'<br /'+'>');
 	}
 	if(metahead == "me"){
 		if(output.substr(0,1) != " ") output = " " + output;
@@ -1505,7 +1636,7 @@ function addQuotes(savvyCode,compress){
 		if(compress){
 			return '\r<t' + RegExp.$1 + 't><p' + content + 'p>\r';
 		}
-		return '\r<blockquote><a onclick="if(this.nextSibling.style.display==&quot;none&quot;){this.nextSibling.style.display=&quot;block&quot;;scrollDown();}else{this.nextSibling.style.display=&quot;none&quot;}return false;" href="">Show/Hide <span class="collapsetitle">' + RegExp.$1 + '</span></a><div style="display:none;">' + content + '</div></blockquote>\r';
+		return '\r<blockquote class="spoiler"><a onclick="if(this.nextSibling.style.display==&quot;none&quot;){this.nextSibling.style.display=&quot;block&quot;;scrollDown();}else{this.nextSibling.style.display=&quot;none&quot;}return false;" href="">Show/Hide <span class="collapsetitle">' + RegExp.$1 + '</span></a><div style="display:none;">' + content + '</div></blockquote>\r';
 	}
 	if(compress){
 		return '\r<q\r' + content + '\rq>\r';
@@ -1736,12 +1867,16 @@ function togglePreview(checkbox){
 
 //called when the tone alert option box is checked
 function toggleAlert(checkbox){
+	var abort = function(){
+		//not sure what the best thing to do is here
+		onClose();
+	}
 	if(checkbox.checked){
 		disableAlert = false;
-		sendMessage('/tone', {param: 'a=true'});
+		sendMessage('/tone', {param: 'a=true', abort: abort});
 	}else{
 		disableAlert = true;
-		sendMessage('/tone', {param: 'a=false'});
+		sendMessage('/tone', {param: 'a=false', abort: abort});
 	}
 }
 
@@ -1823,8 +1958,9 @@ function fitWindow(){
 	scrollDown();
 }
 
-var mInt;
+var mInt = null;
 function marquee(){
+	clearInterval(mInt);
 	mInt = setInterval("document.getElementById('topic').scrollLeft += 4;",50);
 }
 function unmarquee(){
@@ -1855,7 +1991,7 @@ function onLoadBody(){
 	
 	window.onbeforeunload = function(){
 		//this is flaky
-		sendMessage('/closed', {param: 'u=' + userid + '&t=' + tokenid});
+		closeMessage();
 	}
 	
 	scrollDown();

@@ -390,6 +390,13 @@ class SyncPage(webapp.RequestHandler):
 		message = simplejson.dumps({'posts':posts,'cursor':startcursor})
 		self.response.out.write(message)
 		#channel.send_message(self.request.get('t'), message)
+
+class PingPage(webapp.RequestHandler):
+	def post(self):
+		token = self.request.get('t')
+		if token:
+			channel.send_message(token, simplejson.dumps({"ping":"ping"}))
+			return self.response.out.write("ping") #for abort logic
 		
 class TokenPage(webapp.RequestHandler):
 	#this creates a new token, for when an old one expires
@@ -440,7 +447,9 @@ class ClosedPage(webapp.RequestHandler):
 		except ValueError:
 			#token has been removed already
 			pass
-		chatuser.lastonline = datetime.utcnow()
+		if not self.request.get('e'):
+			#we didn't error out, this user has seen all messages
+			chatuser.lastonline = datetime.utcnow()
 		chatuser.put()
 		
 class TonePage(webapp.RequestHandler):
@@ -553,6 +562,10 @@ class MainPage(webapp.RequestHandler):
 		if self.request.get('disableMath'):
 			disableMath = True
 		
+		suppressErrors = False
+		if self.request.get('suppressErrors'):
+			suppressErrors = True
+		
 		gadget = False
 		v = ""
 		container = ""
@@ -580,7 +593,8 @@ class MainPage(webapp.RequestHandler):
 							'v':v,
 							'libs':libs,
 							'container':container,
-							'disableMath':disableMath}
+							'disableMath':disableMath,
+							'suppressErrors':suppressErrors}
 		self.response.out.write(template.render('index.htm', template_values))
 
 class AdminPage(webapp.RequestHandler):
@@ -639,6 +653,7 @@ application = webapp.WSGIApplication([
 									('/call', CallPage),
 									('/retrieve', RetrievePage),
 									('/sync', SyncPage),
+									('/ping', PingPage),
 									('/tone', TonePage),
 									('/token', TokenPage),
 									('/upload', UploadPage),

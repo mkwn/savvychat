@@ -33,7 +33,7 @@ MathJax.Hub.Config({
 <li><span class="code">I am **very** angry</span> renders as &quot;I am <strong>very</strong> angry&quot;</li>
 <li><span class="code">Nice //ad hominem//, bro</span> renders as &quot;Nice <em>ad hominem</em>, bro&quot;</li>
 <li><span class="code">I __love__ hate you</span> renders as &quot;I <span class="strikethrough">love</span> hate you&quot;</li>
-<li>Text within <span class="code">`</span> tags (backtick, underneath your esc key) does not have formatting applied and is displayed as-is in a fixed-width font (for displaying computer code or an ASCII diagram).<br />Example: <span class="code">`def exp(x,y): return x**y`</span> renders as &quot;<span class="code">def exp(x,y): return x**y</span>&quot;</li>
+<li>Text within <span class="code">`</span> tags (backtick, underneath your esc key) does not have formatting applied and is displayed as-is in a fixed-width font (for displaying computer code or an ASCII diagram). If you actually want to type a backtick, you can do this with a double backtick.<br />Example: <span class="code">```I am **very** angry```</span> renders as &quot;<span class="code">`I am **very** angry`</span>&quot;</li>
 <li>You can also typeset math in TeX: <span class="code">$<a></a>$e=mc^2$<a></a>$</span> renders as &quot;\(e=mc^2\)&quot;. Math can take some time to render on slower computers.</li>
 <li>You can make a bulleted list by prefixing each line of the list with <span class="code">-&nbsp;</span> (that's hyphen-space)</li>
 <li>You can quote someone by starting a line with <span class="code">&gt;</span> (click the quote button next to someone's post for an example). If the first line of a quote is <span class="code">&gt;&lt;label</span>, then the quote becomes collapsible (you can use this for spoilers)</li>
@@ -63,7 +63,7 @@ Keyboard shortcuts include ctrl+b for bold, ctrl+i for italics and ctrl+q for qu
 <li><span class="code">|mute</span>: mute or unmute all sounds, including the ringing tone when called.</li>
 <li><span class="code">|archive:n</span>: retrieve the last n posts in the message archive, or 20 if a number isn't specified.</li>
 <li><span class="code">|sync</span>: if there was some kind of connection problem and you failed to recieve some messages, this command will synchronize the discussion.</li>
-<li><span class="strikethrough"><span class="code">|ping</span>: this command is mostly for my use, it tests whether your connection is active without the need to send a message.</span></li>
+<li><span class="code">|ping</span>: this command is mostly for my use, it tests whether your connection is active without the need to send a message.</li>
 <li><span class="code">|refresh</span>: if for some reason your connection seems to have failed without raising an error, this command will refresh your token, reopening a channel. This command is called automatically every so often.</li>
 <li><span class="code">|upload</span>: open the file/image upload dialog. The size limit is just under 1MB. There is not yet an upload progress bar, so be patient after you click the upload button.</li>
 <li><span class="code">|logout</span>: Log out of your Google Account and SavvyChat.</li>
