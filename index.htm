@@ -521,8 +521,11 @@ function onClose(){
 	refreshToken(1);
 }
 
-function displayNote(text){
-	var post = {content:"|notify|"+text, author:"SavvyChat", date:"", recipients:[]};
+var noteLog = [];
+function displayNote(post, skipLog){
+	if(post.constructor == String)
+		post = {content:"|notify|"+post, author:"SavvyChat", date:"", recipients:[]};
+	if(!skipLog) noteLog.push(post);
 	recievePost(post);
 }
 
@@ -731,6 +734,15 @@ function sendPost(){
 			ping(true);
 			return;
 			break;
+		case "notes":
+			displayNote("Start of notification log",true);
+			for(note in noteLog){
+				displayNote(noteLog[note],true);
+			}
+			displayNote("End of notification log",true);
+			noteLog.push("Viewed notification log (snipped)");
+			return;
+			break;
 		case "refresh":
 			refreshToken();
 			return;
@@ -758,7 +770,7 @@ function sendPost(){
 	var abort = function(){
 		var note = 'Your post failed to send:\n\n`'+backupText.replace(/`/g,"``")+"`";
 		displayNote(note);
-		failNotify.push(note);
+		failNotify.push(noteLog.length - 1);
 		onClose();
 	};
 
@@ -781,7 +793,7 @@ function sendPost(){
 			abort = function(){
 				var note = 'Call email failed to send for some reason.';
 				displayNote(note);
-				failNotify.push(note);
+				failNotify.push(noteLog.length - 1);
 				onClose();
 				onClose();
 			};
@@ -893,7 +905,7 @@ function sync(){
 		recieveSync(m.posts);
 		syncing = false;
 		for(note in failNotify){
-			displayNote(failNotify[note])
+			displayNote(noteLog[failNotify[note]])
 		}
 		failNotify = [];
 		showPreview(true);
@@ -1255,6 +1267,7 @@ function recievePost(post,ignoretopics,prepend){
 		scrollLocked = true;
 		scrollDown();
 		classtext = ' notifypost';
+		if(post.author != "SavvyChat") noteLog.push(post);
 	}else{
 		if(gotCalled(post)){
 			classtext = ' callpost';
@@ -1289,14 +1302,16 @@ function recievePost(post,ignoretopics,prepend){
 		//hide author label for repeated posts by the same author
 		if(postlist.lastChild){
 			if(parsedObj.html != ""){
-				if(postlist.lastChild.childNodes[1].innerHTML == parsedObj.authortext){
-					newdiv.childNodes[1].style.display = "None";
-					addClass(newdiv,"joinedattop");
-					addClass(postlist.lastChild,"joinedatbottom");
-					//newdiv.style.marginTop = "0";
-					//newdiv.style.paddingTop = "0";
-					//postlist.lastChild.style.paddingBottom = "0";
-					//postlist.lastChild.innerHTML += "<hr SLASH>";
+				if(metahead !== "notify"){
+					if(postlist.lastChild.childNodes[1].innerHTML == parsedObj.authortext){
+						newdiv.childNodes[1].style.display = "None";
+						addClass(newdiv,"joinedattop");
+						addClass(postlist.lastChild,"joinedatbottom");
+						//newdiv.style.marginTop = "0";
+						//newdiv.style.paddingTop = "0";
+						//postlist.lastChild.style.paddingBottom = "0";
+						//postlist.lastChild.innerHTML += "<hr SLASH>";
+					}
 				}
 			}
 		}
@@ -1306,14 +1321,16 @@ function recievePost(post,ignoretopics,prepend){
 		//hide author label for repeated posts by the same author
 		if(postlist.firstChild){
 			if(parsedObj.html != ""){
-				if(postlist.firstChild.childNodes[1].innerHTML == parsedObj.authortext){
-					postlist.firstChild.childNodes[1].style.display = "None";
-					addClass(newdiv,"joinedatbottom");
-					addClass(postlist.firstChild,"joinedattop");
-					//postlist.firstChild.style.marginTop = "0";
-					//postlist.firstChild.style.paddingTop = "0";
-					//newdiv.style.paddingBottom = "0";
-					//newdiv.innerHTML += "<hr SLASH>";
+				if(metahead !== "notify"){
+					if(postlist.firstChild.childNodes[1].innerHTML == parsedObj.authortext){
+						postlist.firstChild.childNodes[1].style.display = "None";
+						addClass(newdiv,"joinedatbottom");
+						addClass(postlist.firstChild,"joinedattop");
+						//postlist.firstChild.style.marginTop = "0";
+						//postlist.firstChild.style.paddingTop = "0";
+						//newdiv.style.paddingBottom = "0";
+						//newdiv.innerHTML += "<hr SLASH>";
+					}
 				}
 			}
 		}
@@ -1504,6 +1521,10 @@ function getHTMLfromSavvyCode(savvyCode, domath, author, compress){
 			if(pinging)str = "Pinging in progress, command disabled";
 			return {meta:'ping',html:'<strong>'+str+' (will not send)</strong>', authortext:authortext};
 			break;
+		case "notes":
+			str = 'Special command to view all notifications from this session';
+			return {meta:'notes',html:'<strong>'+str+' (will not send)</strong>', authortext:authortext};
+			break;
 		case "refresh":
 			str = 'Special command to request new channel token to refresh connection';
 			if(refreshing)str = "Refreshing in progress, command disabled";
@@ -1687,6 +1708,7 @@ function checkKeys(e){
 	if (e.keyCode) code = e.keyCode;
 	else code = e.which;
 	var character = String.fromCharCode(code).toLowerCase();
+	//if(code == 38 && upKeyOK)
 	if(e.shiftKey && code == 13){
 		sendPost();
 		return stopBubble(e);

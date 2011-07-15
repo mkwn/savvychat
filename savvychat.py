@@ -35,7 +35,7 @@ class Global(db.Model):
 	def get(cls, key):
 		instance = cls.get_by_key_name(key)
 		if not instance:
-			return "None"
+			return None
 		return cls.get_by_key_name(key).value
 
 	@classmethod
@@ -557,6 +557,7 @@ class MainPage(webapp.RequestHandler):
 		
 		#get topic
 		topic = Global.get('topic')
+		if not topic: topic = "Welcome to SavvyChat!"
 		
 		disableMath = False
 		if self.request.get('disableMath'):
