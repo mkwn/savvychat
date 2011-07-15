@@ -448,9 +448,8 @@ var checkTimeout = null;
 function onOpen(){
 	//sendMessage('/opened');
 	sync();
-	ping();
 	clearTimeout(checkTimeout);
-	checkTimeout = setTimeout("ping(false);",5*60*1000);
+	checkTimeout = setTimeout("ping(false);",1000);
 }
 var allowance = {};
 function allowSend(allow,cause){
@@ -500,9 +499,6 @@ function refreshToken(time){
 		token = arr.join("@@");
 		openChannel();
 		allowSend(true,"error");
-		ping(false);
-		clearTimeout(checkTimeout);
-		checkTimeout = setTimeout("ping(false);",5*60*1000);
 		refreshing = false;
 		showPreview(true);
 	};
@@ -518,6 +514,7 @@ function refreshToken(time){
 function onClose(){
 	{% if suppressErrors %}return;{% endif %}
 	clearTimeout(expectTimeout);
+	clearTimeout(expectTimeoutPost);
 	clearTimeout(checkTimeout);
 	if(refreshing) return;
 	displayNote("Connection error. Savvychat is attempting to refresh your connection. If this doesn't work, please [[reload SavvyChat@@javascript:closeMessage();location.reload();]].");
@@ -604,16 +601,17 @@ function gotCalled(post){
 }
 
 var alerted = false;
+var expectTimeoutPost = null;
 //on recieving any message from the server
 function onMessage(message){
 
 	//every 5 minutes we should try a ping
 	clearTimeout(checkTimeout);
 	checkTimeout = setTimeout("ping(false);",5*60*1000);
-	clearTimeout(expectTimeout);
 	
 	var m = JSON.parse(message.data);
 	if(m.content){
+		clearTimeout(expectTimeoutPost);
 		if(syncing){
 			syncInterrupt = true;
 			return;
@@ -638,6 +636,7 @@ function onMessage(message){
 		return;
 	}
 	if(m.ping){
+		clearTimeout(expectTimeout);
 		if(notifyPing){
 			d = new Date();
 			note = "Successful ping. Latency was " + (d.getTime()-pingStart) + "ms.";
@@ -797,8 +796,8 @@ function sendPost(){
 		var blockSize = enctext.length - excess; //i don't want to hardcode it in case i change something in sendMessage
 		processParts(partNo, blockSize, text, enctext)
 	}
-	clearTimeout(expectTimeout);
-	expectTimeout = setTimeout("onClose();",10*1000);
+	clearTimeout(expectTimeoutPost);
+	expectTimeoutPost = setTimeout("onClose();",10*1000);
 	document.getElementById("preview").innerHTML = "";
 	//showPreview(true);
 	document.getElementById("authorpreview").innerHTML = username + ":";
@@ -930,7 +929,7 @@ function ping(notify){
 	d = new Date();
 	pingStart = d.getTime();
 	clearTimeout(expectTimeout);
-	expectTimeout = setTimeout("onClose();",10*1000);
+	expectTimeout = setTimeout("pinging=false;onClose();",10*1000);
 	if(notify){
 		//notify
 	}
@@ -2082,7 +2081,7 @@ function onFocus(){
 		alerted = false;
 	}
 }
-//these need to be set outside of onloadbody lest it get out of sync before the page loads
+//these need to be set outside of onloadbody lest it get out of sync before the page loads. Even so, it could fail if the page loads unfocused.
 if(document.onfocusin === null){
 	//IE needs its own special method to detect window focus or it gets confused with the textarea, poor mentally disabled child
 	document.onfocusin = onFocus;
