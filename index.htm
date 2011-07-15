@@ -932,9 +932,11 @@ function ping(notify){
 	var callback = function(response){};
 	var abort = function(response){
 		pinging = false;
-		var note = 'Ping failed.';
-		displayNote(note);
-		failNotify.push(note);
+		if(notifyPing){
+			var note = 'Ping failed.';
+			displayNote(note);
+			failNotify.push(note);
+		}
 		onClose();
 	};
 	sendMessage('/ping', {param: 't=' + tokenid, abort:abort, callback:callback});
