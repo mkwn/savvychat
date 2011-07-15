@@ -524,7 +524,7 @@ function onClose(){
 var noteLog = [];
 function displayNote(post, skipLog){
 	if(post.constructor == String)
-		post = {content:"|notify|"+post, author:"SavvyChat", date:"", recipients:[]};
+		post = {content:"|notify|"+post, author:"SavvyChat", date:new Date(), recipients:[]};
 	if(!skipLog) noteLog.push(post);
 	recievePost(post);
 }
@@ -905,7 +905,7 @@ function sync(){
 		recieveSync(m.posts);
 		syncing = false;
 		for(note in failNotify){
-			displayNote(noteLog[failNotify[note]])
+			displayNote(noteLog[failNotify[note]],true)
 		}
 		failNotify = [];
 		showPreview(true);
@@ -1155,7 +1155,9 @@ function recievePost(post,ignoretopics,prepend){
 	var cachedmathpreview = mathpreview;
 	var parsedObj =	getHTMLfromSavvyCode(post.content, true, post.author);
 	var postdate;
-	if(post.date == ""){
+	if(post.date.constructor == Date){
+		postdate = post.date;
+	}else if(post.date == ""){
 		postdate = new Date();
 	}else{
 		postdate = new Date(parseFloat(post.date)*1000);

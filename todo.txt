@@ -94,4 +94,3 @@ mathjax is being strange with stuff that happens just as the page loads, empty $
 stumbleupon and such break the window alignment
 |tag| is annoying to type
 i've overloaded //// so you can't use it to type a backtick just before a code block
-date/time is reset with a persistent displayNotify
