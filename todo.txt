@@ -1,5 +1,4 @@
 PRIORITY 0: DEFECTS
-
 set icon before page load?
 sometimes i get connection error without timeout refresh
 consider implications of deadline error
@@ -24,6 +23,9 @@ fix timezones in dump
 PRIORITY 1: IMPORTANT
 call/title in one command
 all options should save
+	tone
+	hf
+	shift+enter to send/newline
 email a log every day?
 autoparse parentheses like (http://a)
 if message is long, preview less frequently to avoid lag
@@ -92,3 +94,4 @@ mathjax is being strange with stuff that happens just as the page loads, empty $
 stumbleupon and such break the window alignment
 |tag| is annoying to type
 i've overloaded //// so you can't use it to type a backtick just before a code block
+date/time is reset with a persistent displayNotify

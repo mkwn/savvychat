@@ -920,6 +920,7 @@ function ping(notify){
 	//send ping, recieve confirmation. Time it
 	var callback = function(response){};
 	var abort = function(response){
+		pinging = false;
 		var note = 'Ping failed.';
 		displayNote(note);
 		failNotify.push(note);
