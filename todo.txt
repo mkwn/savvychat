@@ -16,11 +16,15 @@ math in spoilers is bold for some reason, seems to be because of display:none an
 math is using image fonts in gadget
 ben has an opaque id for old posts
 limit topic length
-dont update lastonline if there's an error
 sync periodically - sometimes stuff doesn't send
 fix timezones in dump
 
 PRIORITY 1: IMPORTANT
+don't hardcode the savvychat url anywhere
+	gadget xml
+	call email
+authenticate more stuff
+do something on logout
 call/title in one command
 all options should save
 	tone

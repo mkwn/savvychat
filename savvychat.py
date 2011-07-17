@@ -254,6 +254,15 @@ def doPost(content, author=None):
 		pass
 	#call(post.recipients,authoruser.name,contenttext)
 
+def declareUpdate(self):
+	lastDate = datetime.utcnow().date()
+	dateArg = self.request.get('d')
+	if dateArg:
+		lastDate = datetime.fromtimestamp(int(dateArg)).date()
+
+	Global.set("lastUpdate",str(lastDate))
+	return self.response.out.write("done")
+
 def dump(self):
 	#make a dump of all posts
 	#get start time
@@ -558,6 +567,12 @@ class MainPage(webapp.RequestHandler):
 		#get topic
 		topic = Global.get('topic')
 		if not topic: topic = "Welcome to SavvyChat!"
+
+		lastUpdate = Global.get("lastUpdate")
+		if not lastUpdate:
+			lastUpdate = ""
+		else:
+			lastUpdate = " Last updated on " + lastUpdate + "."
 		
 		disableMath = False
 		if self.request.get('disableMath'):
@@ -586,6 +601,7 @@ class MainPage(webapp.RequestHandler):
 							'logouturl':logouturl,
 							'subtitle':subtitle,
 							'topic':topic,
+							'lastUpdate':lastUpdate,
 							'showarchive':showarchive,
 							'startquerycursor':startquerycursor,
 							'endquerycursor':endquerycursor,
@@ -611,11 +627,13 @@ class AdminPage(webapp.RequestHandler):
 
 		typeString = self.request.get('type')
 		if not typeString:
-			return self.response.out.write('<a href="?type=dump">Dump posts</a><br /><a href="?type=white">Initialize whitelist</a>')
+			return self.response.out.write('<a href="?type=dump">Dump posts</a><br /><a href="?type=white">Initialize whitelist</a><br /><a href="?type=date">Declare update</a>')
 		if typeString == "dump":
 			return dump(self)
 		if typeString == "white":
 			return initWhite(self)
+		if typeString == "date":
+			return declareUpdate(self)
 
 class UploadPage(webapp.RequestHandler):
 	def post(self):

@@ -425,7 +425,7 @@ function sendMessage(path, opt){
 }
 
 function closeMessage(){
-	var errorparam = refreshing ? '&e=true' : '';
+	var errorparam = connectionError ? '&e=true' : '';
 	sendMessage('/closed', {param: 'u=' + userid + '&t=' + tokenid + errorparam});
 }
 
@@ -468,30 +468,19 @@ function allowSend(allow,cause){
 var failNotify = [];
 var refreshing = false;
 var refreshTimeout = null;
+var connectionError = false;
 function refreshToken(time){
+	if(refreshing) return;
 	if(!time) time = 1;
 	refreshing = true;
 	showPreview(true);
 	allowSend(false,"error");
+	connectionError = true;
 	clearInterval(refreshTimeout);
 	socket.onclose = function(){};
 	socket.onerror = function(){};
 	socket.close();
 	var callback = function(response){
-		if(!response){
-			if(!windowFocus&&!alerted){
-				if(!disableAlert&&!mute){
-					//playAlert("error");
-				}
-			}
-			setIcon("error.ico");
-			document.title = "! SavvyChat";
-			alerted = false;
-			displayNote("Reconnect failed. Retrying in "+time+" seconds. [[Try now@@javascript:refreshToken(1)]]");
-			clearTimeout(refreshTimeout)
-			refreshTimeout = setTimeout("refreshToken("+Math.min(time*2,60)+");",time*1000);
-			return;
-		}
 		setIcon("favicon.ico");
 		document.title = "SavvyChat";
 		var arr = response.split("@@")
@@ -501,8 +490,24 @@ function refreshToken(time){
 		allowSend(true,"error");
 		refreshing = false;
 		showPreview(true);
+		connectionError = false;
 	};
-	sendMessage('/token',{callback:callback, param: 't=' + tokenid, abort:callback});
+	var abort = function(){
+		if(!windowFocus&&!alerted){
+			if(!disableAlert&&!mute){
+				//playAlert("error");
+			}
+		}
+		setIcon("error.ico");
+		refreshing = false;
+		document.title = "! SavvyChat";
+		alerted = false;
+		displayNote("Reconnect failed. Retrying in "+time+" seconds. [[Try now@@javascript:refreshToken(1);]]");
+		clearTimeout(refreshTimeout)
+		refreshTimeout = setTimeout("refreshToken("+Math.min(time*2,60)+");",time*1000);
+		return;
+	}
+	sendMessage('/token',{callback:callback, param: 't=' + tokenid, abort:abort});
 	//badChannelTimeout = setTimeout(function(){
 		//displayNote("Session expired or failed. Savvychat will attempt to aquire a new connection, but possibly you may need to refresh the page.");});
 	//sendMessage('/closed');
@@ -516,7 +521,7 @@ function onClose(){
 	clearTimeout(expectTimeout);
 	clearTimeout(expectTimeoutPost);
 	clearTimeout(checkTimeout);
-	if(refreshing) return;
+	if(connectionError) return;
 	displayNote("Connection error. Savvychat is attempting to refresh your connection. If this doesn't work, please [[reload SavvyChat@@javascript:closeMessage();location.reload();]].");
 	refreshToken(1);
 }
@@ -735,11 +740,11 @@ function sendPost(){
 			return;
 			break;
 		case "notes":
-			displayNote("Start of notification log",true);
+			displayNote("**Start of notification log**",true);
 			for(note in noteLog){
 				displayNote(noteLog[note],true);
 			}
-			displayNote("End of notification log",true);
+			displayNote("**End of notification log**",true);
 			noteLog.push("Viewed notification log (snipped)");
 			return;
 			break;
@@ -2182,7 +2187,7 @@ function goToView(dest) {
 			<!--</form>-->
 		</div>
 		<div id="footer">
-			SavvyChat was built with the <a href="http://code.google.com/appengine/">Google App Engine SDK</a> by <a href="mailto:fearthekwan@gmail.com">Matthew Kwan</a> for private use. Last update was on 13 May 2011.
+			SavvyChat was built with the <a href="http://code.google.com/appengine/">Google App Engine SDK</a> by <a href="mailto:fearthekwan@gmail.com">Matthew Kwan</a> for private use.{{ lastUpdate }}
 		</div>
 	</div>
 </div>
