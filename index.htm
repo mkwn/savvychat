@@ -326,6 +326,9 @@ var denyretrieve = true;
 denyretrieve = false;
 {% endif %}
 var verbose = true;//this specifies whether the header and footer are shown
+{% if not hf %}
+verbose = false;
+{% endif %}
 var currPostID = 0;
 var endquerycursor = '{{ endquerycursor }}';
 var startquerycursor = '{{ startquerycursor }}';
@@ -333,6 +336,10 @@ var disableSend = false
 var windowFocus = true;
 var mute = false;
 var socket;
+var shiftSend = true;
+{% if not shiftSend %}
+shiftSend = false;
+{% endif %}
 }
 
 //http://snipplr.com/view/3561/addclass-removeclass-hasclass/
@@ -674,6 +681,7 @@ function logout(){
 }
 
 var backupText = "";
+var showingLog = false;
 //send a new post to the server
 function sendPost(){
 	text = document.getElementById("composefield").value.replace(/\r/g,"");
@@ -695,8 +703,18 @@ function sendPost(){
 		case "hf":
 			//header and footer
 			verbose = !verbose;
+			if(verbose) sendMessage('/options', {param: 'type=hf&h=true'});
+			else sendMessage('/options', {param: 'type=hf&h=false'});
 			wh = 0;//force a refit
 			fitWindow();
+			return showPreview(true);
+			break;
+		case "shift":
+			//header and footer
+			shiftSend = !shiftSend;
+			updatePostText();
+			if(shiftSend) sendMessage('/options', {param: 'type=shiftsend&s=true'});
+			else sendMessage('/options', {param: 'type=shiftsend&s=false'});
 			return showPreview(true);
 			break;
 		case "help":
@@ -740,12 +758,14 @@ function sendPost(){
 			return;
 			break;
 		case "notes":
+			showingLog = true;
 			displayNote("**Start of notification log**",true);
 			for(note in noteLog){
 				displayNote(noteLog[note],true);
 			}
 			displayNote("**End of notification log**",true);
 			noteLog.push("Viewed notification log (snipped)");
+			showingLog = false;
 			return;
 			break;
 		case "refresh":
@@ -1276,7 +1296,7 @@ function recievePost(post,ignoretopics,prepend){
 		scrollLocked = true;
 		scrollDown();
 		classtext = ' notifypost';
-		if(post.author != "SavvyChat") noteLog.push(post);
+		if(post.author != "SavvyChat" && !showingLog) noteLog.push(post);
 	}else{
 		if(gotCalled(post)){
 			classtext = ' callpost';
@@ -1492,6 +1512,11 @@ function getHTMLfromSavvyCode(savvyCode, domath, author, compress){
 			str = "hide header and footer";
 			if(!verbose) str = "show header and footer as normal";
 			return {meta:'hf',html:'<strong>Special command to '+str+' (will not send)</strong>', authortext:authortext};
+			break;
+		case "shift":
+			str = "change the send shortcut to SHIFT+ENTER";
+			if(shiftSend) str = "change the send shortcut to ENTER";
+			return {meta:'shift',html:'<strong>Special command to '+str+' (will not send)</strong>', authortext:authortext};
 			break;
 		case "tone":
 			str = "enable";
@@ -1718,7 +1743,7 @@ function checkKeys(e){
 	else code = e.which;
 	var character = String.fromCharCode(code).toLowerCase();
 	//if(code == 38 && upKeyOK)
-	if(e.shiftKey && code == 13){
+	if((!e.shiftKey ^ shiftSend) && code == 13){
 		sendPost();
 		return stopBubble(e);
 	}
@@ -1898,17 +1923,17 @@ function togglePreview(checkbox){
 
 //called when the tone alert option box is checked
 function toggleAlert(checkbox){
-	var abort = function(){
-		//not sure what the best thing to do is here
-		onClose();
-	}
 	if(checkbox.checked){
 		disableAlert = false;
-		sendMessage('/tone', {param: 'a=true', abort: abort});
+		sendMessage('/options', {param: 'type=tone&a=true'});
 	}else{
 		disableAlert = true;
-		sendMessage('/tone', {param: 'a=false', abort: abort});
+		sendMessage('/options', {param: 'type=tone&a=false'});
 	}
+}
+
+function updatePostText(){
+	document.getElementById('postbutton').value = shiftSend ? "Post (Shift+Enter)" : "Post (Enter)";
 }
 
 //in gadget mode
@@ -1950,7 +1975,7 @@ function fitWindow(){
 					document.getElementById('alertchecklabel').innerHTML = "&#x266B;";
 				}
 			}else{
-				document.getElementById('postbutton').value = "Post (Shift+Enter)";
+				updatePostText();
 				document.getElementById('postbutton').style.width = "150px";
 				document.getElementById('previewchecklabel').innerHTML = "live preview&nbsp;&nbsp;";
 				document.getElementById('alertchecklabel').innerHTML = "play alert tone";
@@ -2013,6 +2038,8 @@ function onLoadBody(){
 	
 	document.getElementById("authorpreview").innerHTML = username+":";
 	
+	updatePostText();
+
 	//size everything
 	fitWindow();
 	ww = 0;
@@ -2178,7 +2205,7 @@ function goToView(dest) {
 				<iframe onload="loadiFrame();" id="uploadtarget" name="uploadtarget" src="" style="display:none"></iframe>
 			</div></form>
 			<div><textarea id="composefield" onkeyup="showPreview();" autofocus="autofocus"></textarea></div>
-			<div><input id="postbutton" type="button" value="Post (Shift+Enter)" onclick="sendPost();">&nbsp;&nbsp;
+			<div><input id="postbutton" type="button" value="Post" onclick="sendPost();">&nbsp;&nbsp;
 			<span id="supercheckpreview"><input id="previewcheck" type="checkbox" onclick="togglePreview(this);" /><label for="previewcheck" id="previewchecklabel">live preview&nbsp;&nbsp;</label></span><input id="alertcheck" type="checkbox" onclick="toggleAlert(this);" /><label for="alertcheck" id="alertchecklabel">play alert tone</label>
 			{% if gadget %}
 			&nbsp;&nbsp;<a onclick="expand();" href="javascript:window.open('http://savvychat.appspot.com');">Expand</a>

@@ -59,6 +59,8 @@ class Chatuser(db.Model):
 	tokens = db.StringListProperty()
 	lastrefreshlist = db.ListProperty(datetime)
 	playtone = db.BooleanProperty(default=False)
+	shiftsend = db.BooleanProperty(default=True)
+	hf = db.BooleanProperty(default=True)
 	lastonline = db.DateTimeProperty()
 	
 class File(db.Model):
@@ -461,24 +463,29 @@ class ClosedPage(webapp.RequestHandler):
 			chatuser.lastonline = datetime.utcnow()
 		chatuser.put()
 		
-class TonePage(webapp.RequestHandler):
-	#for when someone changes the alert tone settings
+class OptionsPage(webapp.RequestHandler):
+	#for when someone changes some setting
 	def post(self):
-		#remove token
+		#authenticate
 		user = users.get_current_user()
 		if not user:
 			return
 		chatuser = getUserFromId(user.user_id())
 		if not chatuser:
 			return
-		tone = self.request.get('a')
-		if tone == "true":
-			chatuser.playtone = True
-		else:
-			chatuser.playtone = False
+		typeString = self.request.get('type')
+		if not typeString:
+			return
+		elif typeString == "tone":
+			chatuser.playtone = self.request.get('a') == "true"
+		elif typeString == "hf":
+			chatuser.hf = self.request.get('h') == "true"
+		elif typeString == "shiftsend":
+			chatuser.shiftsend = self.request.get('s') == "true"
+
 		chatuser.lastonline = datetime.utcnow()
 		chatuser.put()
-		
+
 class MainPage(webapp.RequestHandler):
 	def get(self):
 		#authenticate
@@ -561,8 +568,10 @@ class MainPage(webapp.RequestHandler):
 		subtitle = choice(subtitleData.readlines())
 		subtitleData.close()
 		
-		#determine tone alert default
+		#determine options
 		disableAlert = not chatuser.playtone
+		shiftSend = chatuser.shiftsend
+		hf = chatuser.hf
 		
 		#get topic
 		topic = Global.get('topic')
@@ -606,6 +615,8 @@ class MainPage(webapp.RequestHandler):
 							'startquerycursor':startquerycursor,
 							'endquerycursor':endquerycursor,
 							'disableAlert':disableAlert,
+							'shiftSend':shiftSend,
+							'hf':hf,
 							'gadget':gadget,
 							'v':v,
 							'libs':libs,
@@ -673,7 +684,7 @@ application = webapp.WSGIApplication([
 									('/retrieve', RetrievePage),
 									('/sync', SyncPage),
 									('/ping', PingPage),
-									('/tone', TonePage),
+									('/options', OptionsPage),
 									('/token', TokenPage),
 									('/upload', UploadPage),
 									('/admin', AdminPage),
