@@ -1,0 +1,77 @@
+#preview .code{
+background-color: #BBF;
+}
+.callpost .code{
+background-color: #FB9;
+}
+.topicpost .code{
+background-color: #BF9;
+}
+#topic .code{
+background-color: #DDD;
+}
+.notifypost .code{
+background-color: #DDD;
+}
+
+blockquote{
+border-color: #EEE;
+}
+#preview blockquote{
+border-color: #BBF;
+}
+.callpost blockquote{
+border-color: #FB9;
+}
+.notifypost blockquote{
+border-color: #DDD;
+}
+
+#loadingContent{
+background-color: #FFF;
+border-color: #DDD!important;
+}
+
+.notGadgetContent{
+background-color: #FFF;
+border-color: #DDD!important;
+}
+
+.notGadgetArchive{
+background-color: #EEE;
+}
+
+.gadgetTopic{
+background-color: #FFF;
+}
+
+.post{
+background-color: #FFF;
+}
+.callpost{
+background-color: #FDC;
+}
+.topicpost{
+background-color: #EFD;
+}
+.notifypost{
+background-color: #EEE;
+}
+#previewpost{
+background-color: #DDF;
+}
+#previewlabel{
+color: #669;
+}
+
+.gadgetControls{
+background-color: #FFF;
+}
+
+.notGadgetCompose{
+background-color: #DDD;
+}
+
+.gadgetCompose{
+background-color: none;
+}

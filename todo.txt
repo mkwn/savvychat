@@ -1,4 +1,6 @@
 PRIORITY 0: DEFECTS
+in IE7 ping check apparently fails
+ian can't send on firefox
 call abort() when an error page is returned
 set icon before page load?
 sometimes i get connection error without timeout refresh
@@ -22,6 +24,12 @@ fix timezones in dump
 notify shouldn't join to non-notify
 
 PRIORITY 1: IMPORTANT
+themes
+	clean up themes code
+	add to options
+	add to doc
+	add ui
+dont send mails to yourself, but send a special confirmation that can be filtered
 don't hardcode the savvychat url anywhere
 	gadget xml
 	call email

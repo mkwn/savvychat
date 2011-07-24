@@ -8,6 +8,7 @@
 <!--This is for mobile browsers-->
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link type="text/css" rel="stylesheet" href="/stylesheets/main.css" />
+<link type="text/css" rel="stylesheet" href="/stylesheets/{{ theme }}.css" />
 <style type="text/css">
 body{
 overflow: hidden;
@@ -20,21 +21,7 @@ h3,h4{
 margin-bottom: 5px;
 }
 
-#preview .code{
-background-color: #BBF;
-}
-.callpost .code{
-background-color: #FB9;
-}
-.topicpost .code{
-background-color: #BF9;
-}
-#topic .code{
-background-color: #DDD;
-}
-.notifypost .code{
-background-color: #DDD;
-}
+
 div.mathplaceholderblock{
 font-family: Courier New, monospace;
 text-align: center;
@@ -47,19 +34,9 @@ blockquote{
 border: solid;
 border-left: none;
 border-right: none;
-border-color: #EEE;
 border-width: 3px;
 margin-left: 20px;
 margin-right: 20px;
-}
-#preview blockquote{
-border-color: #BBF;
-}
-.callpost blockquote{
-border-color: #FB9;
-}
-.notifypost blockquote{
-border-color: #DDD;
 }
 
 #loadingContainer{
@@ -70,10 +47,8 @@ text-align: center;
 margin-left: auto;
 margin-right: auto;
 width: 150px;
-background-color: #FFF;
 border: solid;
 border-top: none;
-border-color: #DDD;
 border-width: 3px;
 }
 
@@ -86,13 +61,9 @@ margin-left: auto ;
 margin-right: auto ;
 width: 900px;
 position: relative;
-{% if not gadget %}
-background-color: #FFF;
-{% endif %}
 border: solid;
 border-top: none;
 border-bottom: none;
-border-color: #DDD;
 border-width: 3px;
 }
 #header, #archive, #compose, #footer{
@@ -131,14 +102,8 @@ text-align: right;
 right: 10px;
 }
 
-#archive{
-{% if not gadget %}
-background-color: #EEE;
-{% endif %}
-}
 #topic{
 {% if gadget %}
-background-color: #FFF;
 padding-top: 4px;
 padding-left: 5px;
 padding-right: 5px;
@@ -161,7 +126,6 @@ width: 880px;
 height: 400px;
 }
 .post{
-background-color: #FFF;
 padding: 10px;
 {% if gadget %}
 -moz-border-radius: 5px;
@@ -217,30 +181,13 @@ font-size: 70%;
 display: None;
 {% endif %}
 }
-.callpost{
-background-color: #FDC;
-}
-.topicpost{
-background-color: #EFD;
-}
-.notifypost{
-background-color: #EEE;
-}
-#previewpost{
-background-color: #DDF;
-}
+
 #previewlabel{
 margin-left: 10px;
 float: right;
 text-align: right;
-color: #669;
 }
 
-#compose{
-{% if not gadget %}
-background-color: #DDD;
-{% endif %}
-}
 #composefield{
 {% if gadget %}
 -moz-border-radius: 5px;
@@ -258,7 +205,6 @@ margin-bottom: 10px;
 {% if gadget %}
 -moz-border-radius: 5px;
 border-radius: 5px;
-background-color: #FFF;
 {% endif %}
 }
 #postbutton{
@@ -2029,15 +1975,24 @@ function onLoadBody(){
 	MJQT("dummy");//hack to fix a mathjax bug
 		
 	//display all the elements that were hidden while loading
-	document.getElementById("container").style.display="block";
-	document.getElementById("loadingContainer").style.display="None";
+	document.getElementById("container").style.display = "block";
+	document.getElementById("loadingContainer").style.display = "None";
 	
 	document.getElementById("previewcheck").checked = dopreview;
 	togglePreview(document.getElementById("previewcheck"));
 	document.getElementById("alertcheck").checked = !disableAlert;
 	
-	document.getElementById("authorpreview").innerHTML = username+":";
+	document.getElementById("authorpreview").innerHTML = username + ":";
 	
+	if(gadget){
+		addClass(document.getElementById("topic"),"gadgetTopic");
+		addClass(document.getElementById("controls"),"gadgetControls");
+	}else{
+		addClass(document.getElementById("content"),"notGadgetContent");
+		addClass(document.getElementById("archive"),"notGadgetArchive");
+		addClass(document.getElementById("compose"),"notGadgetCompose");
+	}
+
 	updatePostText();
 
 	//size everything

@@ -1,0 +1,104 @@
+body{
+color: #FFF;
+background-color: #000;
+}
+
+.code{
+font-family: Courier New, monospace;
+background-color: #222;
+}
+
+a{
+color:#55F;
+}
+a:visited{
+color:#99F;
+}
+
+#preview .code{
+background-color: #036;
+}
+.callpost .code{
+background-color: #600;
+}
+.topicpost .code{
+background-color: #063;
+}
+#topic .code{
+background-color: #444;
+}
+.notifypost .code{
+background-color: #444;
+}
+
+blockquote{
+border-color: #222;
+}
+#preview blockquote{
+border-color: #036;
+}
+.callpost blockquote{
+border-color: #600;
+}
+.notifypost blockquote{
+border-color: #444;
+}
+
+#loadingContent{
+background-color: #000;
+border-color: #444!important;
+}
+
+#content{
+background-color: #000;
+border-color: #444!important;
+}
+
+.gadgetContent{
+background-color: none;
+}
+
+#archive{
+background-color: #222;
+}
+
+.gadgetTopic{
+background-color: #000;
+}
+
+.post{
+background-color: #000;
+}
+.callpost{
+background-color: #400;
+}
+.topicpost{
+background-color: #042;
+}
+.notifypost{
+background-color: #222;
+}
+#previewpost{
+background-color: #024;
+}
+#previewlabel{
+color: #249;
+}
+
+.gadgetControls{
+background-color: #000;
+}
+
+#compose{
+background-color: #444;
+}
+
+#composefield{
+background-color: #000;
+color: #FFF;
+border-color: #000;
+}
+
+.gadgetCompose{
+background-color: none;
+}

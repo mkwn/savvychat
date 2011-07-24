@@ -492,10 +492,7 @@ class MainPage(webapp.RequestHandler):
 		user = users.get_current_user()
 		if not user:
 			#not logged in, redirect to login page
-			path = '/'
-			if self.request.get('gadget'):
-				path = '/?gadget=true'
-			return self.redirect(users.create_login_url(path))
+			return self.redirect(users.create_login_url(self.request.uri))
 		userid = user.user_id()
 		logouturl = users.create_logout_url(self.request.uri)
 		
@@ -590,6 +587,10 @@ class MainPage(webapp.RequestHandler):
 		suppressErrors = False
 		if self.request.get('suppressErrors'):
 			suppressErrors = True
+
+		theme = self.request.get('theme')
+		if not theme:
+			theme = "white"
 		
 		gadget = False
 		v = ""
@@ -622,7 +623,8 @@ class MainPage(webapp.RequestHandler):
 							'libs':libs,
 							'container':container,
 							'disableMath':disableMath,
-							'suppressErrors':suppressErrors}
+							'suppressErrors':suppressErrors,
+							'theme':theme}
 		self.response.out.write(template.render('index.htm', template_values))
 
 class AdminPage(webapp.RequestHandler):
