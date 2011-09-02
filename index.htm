@@ -420,12 +420,15 @@ function allowSend(allow,cause){
 
 var failNotify = [];
 var refreshing = false;
+var inRefreshSequence = false; // true even if timing between refreshes
 var refreshTimeout = null;
 var connectionError = false;
-function refreshToken(time){
+function refreshToken(time, bypass){
 	if(refreshing) return;
+	if(!bypass && inRefreshSequence) return;
 	if(!time) time = 1;
 	refreshing = true;
+	inRefreshSequence = true;
 	showPreview(true);
 	allowSend(false,"error");
 	connectionError = true;
@@ -442,6 +445,7 @@ function refreshToken(time){
 		openChannel();
 		allowSend(true,"error");
 		refreshing = false;
+		inRefreshSequence = false;
 		showPreview(true);
 		connectionError = false;
 	};
@@ -457,7 +461,7 @@ function refreshToken(time){
 		alerted = false;
 		displayNote("Reconnect failed. Retrying in "+time+" seconds. [[Try now@@javascript:refreshToken(1);]]");
 		clearTimeout(refreshTimeout)
-		refreshTimeout = setTimeout("refreshToken("+Math.min(time*2,60)+");",time*1000);
+		refreshTimeout = setTimeout("refreshToken("+Math.min(time*2,60)+", true);",time*1000);
 		return;
 	}
 	sendMessage('/token',{callback:callback, param: 't=' + tokenid, abort:abort});
@@ -830,7 +834,7 @@ function processParts(partNo, blockSize, text, enctext){
 		};
 		postcontent = encodeURIComponent("|cont:" + (partNo-1) + ",0|") + part
 	}
-	sendMessage('/post', {param: 'p=' + postcontent, callback: callback, abort: abort});
+	sendMessage('/post', {param: 'p=' + postcontent, callback: callback});
 }
 
 var retrieving = false;
