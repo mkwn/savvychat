@@ -24,6 +24,8 @@ fix timezones in dump
 notify shouldn't join to non-notify
 
 PRIORITY 1: IMPORTANT
+store filename with files
+can't really see grey on black background for gadget
 themes
 	clean up themes code
 	add to options

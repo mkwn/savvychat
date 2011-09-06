@@ -31,7 +31,7 @@ font-family: Courier New, monospace;
 }
 
 blockquote{
-border: solid;
+border-style: solid;
 border-left: none;
 border-right: none;
 border-width: 3px;
@@ -459,8 +459,8 @@ function refreshToken(time, bypass){
 		refreshing = false;
 		document.title = "! SavvyChat";
 		alerted = false;
-		displayNote("Reconnect failed. Retrying in "+time+" seconds. [[Try now@@javascript:refreshToken(1);]]");
-		clearTimeout(refreshTimeout)
+		displayNote("Reconnect failed. Retrying in "+time+" seconds. [[Try now@@javascript:clearTimeout(refreshTimeout);refreshToken(1, true);]]");
+		clearTimeout(refreshTimeout);
 		refreshTimeout = setTimeout("refreshToken("+Math.min(time*2,60)+", true);",time*1000);
 		return;
 	}
