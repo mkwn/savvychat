@@ -134,7 +134,7 @@ def decompressHTML(html):
 		workhtml = workhtml.replace(p[0],p[1])
 	return workhtml
 		
-def call(recipients=[], author="a user", plaincontent="", htmlcontent=""):
+def call(self,recipients=[], author="a user", plaincontent="", htmlcontent=""):
 	if recipients == []:
 		return
 	#send out emails
@@ -360,7 +360,7 @@ class CallPage(webapp.RequestHandler):
 				recipients = ["all"]
 		chatuser.lastonline = datetime.utcnow()
 		chatuser.put()
-		call(recipients,chatuser.name,
+		call(self,recipients,chatuser.name,
 			"no plaintext preview available, sign in to savvychat (http://savvychat.appspot.com) to view message",
 			decompressHTML(self.request.get('h')))
 			
