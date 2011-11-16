@@ -1,6 +1,8 @@
 PRIORITY 0: DEFECTS
+in gadget mode, too tall, cant seem to change it
+tony can't scroll the savvychat window on his phone
+opens multiple refresh dialogs when post fails to send
 in IE7 ping check apparently fails
-ian can't send on firefox
 call abort() when an error page is returned
 set icon before page load?
 sometimes i get connection error without timeout refresh
@@ -24,6 +26,11 @@ fix timezones in dump
 notify shouldn't join to non-notify
 
 PRIORITY 1: IMPORTANT
+allow manual resize of gadget
+autoresize tall pictures
+notify who you are calling
+multiple profiles
+dynamic aliases in help
 store filename with files
 can't really see grey on black background for gadget
 themes
@@ -32,11 +39,8 @@ themes
 	add to doc
 	add ui
 dont send mails to yourself, but send a special confirmation that can be filtered
-don't hardcode the savvychat url anywhere
-	gadget xml
-	call email
+
 authenticate more stuff
-do something on logout
 call/title in one command
 email a log every day?
 autoparse parentheses like (http://a)

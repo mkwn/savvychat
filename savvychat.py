@@ -18,6 +18,7 @@ from random import choice
 from sets import Set
 
 import urllib
+import urlparse
 
 import re
 
@@ -151,7 +152,10 @@ def call(recipients=[], author="a user", plaincontent="", htmlcontent=""):
 				TOarray = TOarray + [chatuser.name + ' <' + chatuser.email + '>']
 	if TOarray == []:
 		return
-	mail.send_mail(sender='SavvyChat Mailer <mailer@savvychat.appspotmail.com>',
+	netloc = getNetloc(self).split('.')
+	if len(netloc) >2 and netloc[-2]=="appspot":
+		sender = netloc[-3]
+		mail.send_mail(sender='SavvyChat Mailer <mailer@'+sender+'.appspotmail.com>',
 					to=', '.join(TOarray),
 					subject="You have been called by "+author+" with SavvyChat",
 					body=plaincontent,
@@ -321,6 +325,9 @@ def initWhite(self):
 		whiteuser.put()
 	return self.response.out.write("done")
 
+def getNetloc(self):
+	return urlparse.urlsplit(self.request.url)[1]
+
 class PostPage(webapp.RequestHandler):
 	def post(self):
 		#called on recieving a post
@@ -415,10 +422,12 @@ class TokenPage(webapp.RequestHandler):
 		#first, authenticate:
 		user = users.get_current_user()
 		if not user:
+			self.response.out.write("autherror")
 			return
 		userid = user.user_id()
 		chatuser = getUserFromId(userid)
 		if not chatuser:
+			self.response.out.write("autherror")
 			return
 
 		#next, remove old token in db
@@ -678,6 +687,18 @@ class DownloadHandler(webapp.RequestHandler):
 		file = File.get_by_id(int(id))
 		self.response.headers['Content-Type'] = file.type
 		self.response.out.write(file.data)
+
+class GadgetXMLPage(webapp.RequestHandler):
+	def get(self):
+		disableMath = False
+		if self.request.get('disableMath'):
+			disableMath = True
+		template_values = {'netloc':getNetloc(self),'disableMath':disableMath}
+		return self.response.out.write(template.render('gadget.xml', template_values))
+
+class HelpPage(webapp.RequestHandler):
+	def get(self):
+		return self.response.out.write(template.render('help.htm', {'netloc':getNetloc(self)}))
 		
 application = webapp.WSGIApplication([
 									('/', MainPage),
@@ -691,6 +712,8 @@ application = webapp.WSGIApplication([
 									('/upload', UploadPage),
 									('/admin', AdminPage),
 									('/download/(\d+)/(.*)', DownloadHandler),
+									('/gadget\\.xml', GadgetXMLPage),
+									('/help', HelpPage),
 									('/closed', ClosedPage)])
 
 def main():

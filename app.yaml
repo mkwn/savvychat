@@ -17,14 +17,6 @@ handlers:
 - url: /sounds
   static_dir: sounds
   
-- url: /help.htm
-  static_files: help.htm
-  upload: help.htm
-  
-- url: /gadget.xml
-  static_files: gadget.xml
-  upload: gadget.xml
-  
 - url: /todo.txt
   static_files: todo.txt
   upload: todo.txt

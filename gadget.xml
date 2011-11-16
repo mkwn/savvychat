@@ -2,9 +2,9 @@
 <Module> 
 <ModulePrefs
 	title="SavvyChat" 
-	title_url="http://savvychat.appspot.com/" 
+	title_url="http://{{ netloc }}/" 
 	description="SavvyChat Gadget"
-	height="400"
+	height="300"
 	author="Matthew Kwan"
 >
 <Require feature="dynamic-height"/>
@@ -12,6 +12,6 @@
 <Require feature="settitle" />
 </ModulePrefs>
 
-<Content type="url" href="http://savvychat.appspot.com/?gadget=true" view="home, profile"/>
-<Content type="url" href="http://savvychat.appspot.com" view="default, canvas"/>
+<Content type="url" href="http://{{ netloc }}/?gadget=true{% if disableMath %}&amp;disableMath=true{% endif %}" view="home, profile"/>
+<Content type="url" href="http://{{ netloc }}/?gadget=true{% if disableMath %}&amp;disableMath=true{% endif %}" view="default, canvas"/>
 </Module>

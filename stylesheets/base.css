@@ -1,0 +1,169 @@
+body{
+	overflow: hidden;
+	margin: 0 !important;
+}
+
+h1,h2,h3,h4{
+	margin-top: 0;
+}
+
+h3,h4{
+	margin-bottom: 5px;
+}
+
+div.mathplaceholderblock{
+	font-family: Courier New, monospace;
+	text-align: center;
+}
+span.mathplaceholderinline{
+	font-family: Courier New, monospace;
+}
+
+blockquote{
+	border-style: solid;
+	border-left: none;
+	border-right: none;
+	border-width: 3px;
+	margin-left: 20px;
+	margin-right: 20px;
+}
+
+#loadingContainer{
+	text-align: center;
+}
+
+#loadingContent{
+	text-align: center;
+	margin-left: auto;
+	margin-right: auto;
+	width: 150px;
+	border: solid;
+	border-top: none;
+	border-width: 3px;
+}
+
+#container{
+	text-align: center;
+}
+
+#content{
+	text-align: left;
+	margin-left: auto ;
+	margin-right: auto ;
+	width: 900px;
+	position: relative;
+	border: solid;
+	border-top: none;
+	border-bottom: none;
+	border-width: 3px;
+}
+#header, #archive, #compose, #footer{
+	padding: 10px;
+}
+
+#header{
+	text-align: center;
+	padding-bottom: 30px;
+}
+
+.headerLeft{
+	position: absolute;
+	width: 200px;
+	text-align: right;
+	right: 10px;
+}
+
+#subtitle{
+	position: absolute;
+	width: 900px;
+	left: 0;
+}
+
+#helpTag{
+	position: absolute;
+	width: 200px;
+	text-align: left;
+	left: 10px;
+}
+
+#logoutTag{
+	position: absolute;
+	width: 200px;
+	text-align: right;
+	right: 10px;
+}
+
+#topic{
+	font-weight: bold;
+	margin-bottom: 15px;
+	height: 20px;
+	overflow: hidden;
+	white-space: nowrap;
+}
+
+#topic strong{
+	font-size: 120%;
+}
+
+#postlist{
+	overflow: auto;
+	overflow-x: hidden;
+	width: 880px;
+	height: 400px;
+}
+
+.post{
+	padding: 10px;
+	margin-top: 3px;
+	white-space: pre-wrap;      /* CSS3 */   
+	white-space: -moz-pre-wrap; /* Firefox */    
+	white-space: -pre-wrap;     /* Opera before 7 */
+	white-space: -o-pre-wrap;   /* Opera 7 */    
+	word-wrap: break-word;      /* IE */
+}
+
+.ellipsis{
+	color:red;
+}
+
+.author{
+	font-weight: bold;
+	margin-bottom: 5px;
+}
+.datelabel{
+	margin-left: 10px;
+	float: right;
+	text-align: right;
+	font-size: 70%;
+}
+
+.joinedattop{
+	margin-top: 0;
+}
+
+#previewlabel{
+	margin-left: 10px;
+	float: right;
+	text-align: right;
+}
+
+#composefield{
+	-webkit-box-sizing: border-box;
+	-moz-box-sizing: border-box;
+	box-sizing: border-box;
+	width: 880px;
+	height: 100px;
+	margin-bottom: 10px;
+}
+#postbutton{
+	height: 50px;
+	width: 150px;
+}
+
+#footer{
+	text-align: center;
+}
+
+#container{
+	display: none;
+}

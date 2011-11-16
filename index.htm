@@ -8,218 +8,12 @@
 <!--This is for mobile browsers-->
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link type="text/css" rel="stylesheet" href="/stylesheets/main.css" />
+<link type="text/css" rel="stylesheet" href="/stylesheets/base.css" />
+{% if gadget %}
+<link type="text/css" rel="stylesheet" href="/stylesheets/gadget.css" />
+{% endif %}
 <link type="text/css" rel="stylesheet" href="/stylesheets/{{ theme }}.css" />
-<style type="text/css">
-body{
-overflow: hidden;
-margin: 0 !important;
-}
-h1,h2,h3,h4{
-margin-top: 0;
-}
-h3,h4{
-margin-bottom: 5px;
-}
 
-
-div.mathplaceholderblock{
-font-family: Courier New, monospace;
-text-align: center;
-}
-span.mathplaceholderinline{
-font-family: Courier New, monospace;
-}
-
-blockquote{
-border-style: solid;
-border-left: none;
-border-right: none;
-border-width: 3px;
-margin-left: 20px;
-margin-right: 20px;
-}
-
-#loadingContainer{
-text-align: center;
-}
-#loadingContent{
-text-align: center;
-margin-left: auto;
-margin-right: auto;
-width: 150px;
-border: solid;
-border-top: none;
-border-width: 3px;
-}
-
-#container{
-text-align: center;
-}
-#content{
-text-align: left;
-margin-left: auto ;
-margin-right: auto ;
-width: 900px;
-position: relative;
-border: solid;
-border-top: none;
-border-bottom: none;
-border-width: 3px;
-}
-#header, #archive, #compose, #footer{
-padding: 10px;
-{% if gadget %}
-padding-left: 0px;
-padding-right: 0px;
-{% endif %}
-}
-
-#header{
-text-align: center;
-padding-bottom: 30px;
-}
-.headerLeft{
-position: absolute;
-width: 200px;
-text-align: right;
-right: 10px;
-}
-#subtitle{
-position: absolute;
-width: 900px;
-left: 0;
-}
-#helpTag{
-position: absolute;
-width: 200px;
-text-align: left;
-left: 10px;
-}
-#logoutTag{
-position: absolute;
-width: 200px;
-text-align: right;
-right: 10px;
-}
-
-#topic{
-{% if gadget %}
-padding-top: 4px;
-padding-left: 5px;
-padding-right: 5px;
--moz-border-radius: 5px;
-border-radius: 5px;
-{% endif %}
-font-weight: bold;
-margin-bottom: 15px;
-height: 20px;
-overflow: hidden;
-white-space: nowrap;
-}
-#topic strong{
-font-size: 120%;
-}
-#postlist{
-overflow: auto;
-overflow-x: hidden;
-width: 880px;
-height: 400px;
-}
-.post{
-padding: 10px;
-{% if gadget %}
--moz-border-radius: 5px;
-border-radius: 5px;
-padding: 5px;
-{% endif %}
-margin-top: 3px;
-
-white-space: pre-wrap;      /* CSS3 */   
-white-space: -moz-pre-wrap; /* Firefox */    
-white-space: -pre-wrap;     /* Opera before 7 */
-white-space: -o-pre-wrap;   /* Opera 7 */    
-word-wrap: break-word;      /* IE */
-}
-
-.ellipsis{
-color:red;
-}
-
-.joinedattop{
-margin-top: 0;
-border-top-right-radius: 0;
-border-top-left-radius: 0;
--moz-border-radius-topright: 0;
--moz-border-radius-topleft: 0;
-}
-
-.joinedatbottom{
-border-bottom-right-radius: 0;
-border-bottom-left-radius: 0;
--moz-border-radius-bottomright: 0;
--moz-border-radius-bottomleft: 0;
-}
-
-.withscrollbar .post{
-border-top-right-radius: 0;
-border-bottom-right-radius: 0;
--moz-border-radius-topright: 0;
--moz-border-radius-bottomright: 0;
-}
-
-.author{
-
-font-weight: bold;
-margin-bottom: 5px;
-}
-.datelabel{
-margin-left: 10px;
-float: right;
-text-align: right;
-font-size: 70%;
-{% if gadget %}
-display: None;
-{% endif %}
-}
-
-#previewlabel{
-margin-left: 10px;
-float: right;
-text-align: right;
-}
-
-#composefield{
-{% if gadget %}
--moz-border-radius: 5px;
-border-radius: 5px;
-margin-top: -5px;
-{% endif %}
--webkit-box-sizing: border-box;
--moz-box-sizing: border-box;
-box-sizing: border-box;
-width: 880px;
-height: 100px;
-margin-bottom: 10px;
-}
-#controls{
-{% if gadget %}
--moz-border-radius: 5px;
-border-radius: 5px;
-{% endif %}
-}
-#postbutton{
-height: 50px;
-width: 150px;
-}
-
-#footer{
-text-align: center;
-}
-
-#container{
-display: none;
-}
-</style>
 <!--[if lt IE 7]>
         <script type="text/javascript">alert("SavvyChat will almost certainly not work on your browser");</script>
 <![endif]-->
@@ -423,6 +217,7 @@ var refreshing = false;
 var inRefreshSequence = false; // true even if timing between refreshes
 var refreshTimeout = null;
 var connectionError = false;
+var authError = false;
 function refreshToken(time, bypass){
 	if(refreshing) return;
 	if(!bypass && inRefreshSequence) return;
@@ -432,20 +227,28 @@ function refreshToken(time, bypass){
 	showPreview(true);
 	allowSend(false,"error");
 	connectionError = true;
+	authError = false
 	clearInterval(refreshTimeout);
 	socket.onclose = function(){};
 	socket.onerror = function(){};
 	socket.close();
 	var callback = function(response){
-		setIcon("favicon.ico");
-		document.title = "SavvyChat";
+		refreshing = false;
+		inRefreshSequence = false;
 		var arr = response.split("@@")
+		if(arr.length == 1){
+			//authentication error
+			authError = true;
+			displayNote("Failed to authenticate. You probably logged out. [[Retry@@javascript:clearTimeout(refreshTimeout);refreshToken(1, true);]].");
+			return;
+		}
+		setIcon("favicon.ico");
+		document.title = "SavvyChat";		
 		tokenid = arr.shift();
 		token = arr.join("@@");
 		openChannel();
 		allowSend(true,"error");
-		refreshing = false;
-		inRefreshSequence = false;
+
 		showPreview(true);
 		connectionError = false;
 	};
@@ -455,6 +258,7 @@ function refreshToken(time, bypass){
 				//playAlert("error");
 			}
 		}
+		if(authError) return;
 		setIcon("error.ico");
 		refreshing = false;
 		document.title = "! SavvyChat";
@@ -478,7 +282,7 @@ function onClose(){
 	clearTimeout(expectTimeout);
 	clearTimeout(expectTimeoutPost);
 	clearTimeout(checkTimeout);
-	if(connectionError) return;
+	if(connectionError || authError) return;
 	displayNote("Connection error. Savvychat is attempting to refresh your connection. If this doesn't work, please [[reload SavvyChat@@javascript:closeMessage();location.reload();]].");
 	refreshToken(1);
 }
@@ -743,7 +547,7 @@ function sendPost(){
 	};
 
 	var abort = function(){
-		var note = 'Your post failed to send:\n\n`'+backupText.replace(/`/g,"``")+"`";
+		var note = 'Your post may have failed to send:\n\n`'+backupText.replace(/`/g,"``")+"`";
 		displayNote(note);
 		failNotify.push(noteLog.length - 1);
 		onClose();
@@ -1342,9 +1146,9 @@ function formatDate(d){
 var helpWindow;
 function openHelp(){
 	if(helpWindow==null||helpWindow.closed){
-		helpWindow=window.open('help.htm','','menubar=no,toolbar=no,location=no,status=no,scrollbars=yes,resizable=yes,height=600,width=600');
+		helpWindow=window.open('help','','menubar=no,toolbar=no,location=no,status=no,scrollbars=yes,resizable=yes,height=600,width=600');
 	}else{
-		helpWindow.location='help.htm';
+		helpWindow.location='help';
 	}
 	helpWindow.focus();
 	return false;
@@ -1908,10 +1712,7 @@ function fitWindow(){
 			document.getElementById('composefield').style.width = "880px";
 			document.getElementById('content').style.borderWidth = Math.min(Math.round((ww - 900)/2), 3) + "px";
 		}else{
-			padding = 20;
-			if(gadget){
-				padding = 0;
-			}
+			var padding = 20-20*gadget;
 			document.getElementById('postlist').style.width = ww - padding + "px";
 			document.getElementById('composefield').style.width = ww - padding + "px";
 			document.getElementById('content').style.borderWidth = "0px";
@@ -1958,7 +1759,8 @@ function fitWindow(){
 		apx2 -= Math.round(apx2/3);
 		document.getElementById('postbutton').style.height = 25+Math.round(apx2/3)+"px";
 		document.getElementById('composefield').style.height = apx2+50+"px";
-		availablepx -= document.getElementById('compose').offsetHeight + document.getElementById('topic').offsetHeight + 15 + 20;
+		var padding = 20 - 10*gadget;
+		availablepx -= document.getElementById('compose').offsetHeight + document.getElementById('topic').offsetHeight + 15 + padding;
 		document.getElementById('postlist').style.height = availablepx+"px";
 	}
 	scrollDown();
@@ -2004,7 +1806,8 @@ function onLoadBody(){
 	ww = 0;
 	wh = 0;
 	setTimeout("fitWindow();",100);//some browsers require a few ms to set up the page before resizing can take place
-	if(!gadget) window.onresize = fitWindow;
+	//if(!gadget)
+		window.onresize = fitWindow;
 	
 	window.onbeforeunload = function(){
 		//this is flaky
@@ -2140,7 +1943,7 @@ function goToView(dest) {
 		<div id="header">
 			<h1>SavvyChat <span class="sup" style="position:absolute;color:#999">beta</span></h1>
 			<div id="subtitle">{{ subtitle }}</div>
-			<div id="helpTag"><a onclick="return openHelp('');" href="help.htm">Help</a></div>
+			<div id="helpTag"><a onclick="return openHelp('');" href="help">Help</a></div>
 			<div id="logoutTag"><a onclick="logout();return false;" href="{{ logouturl }}">Logout</a></div>
 		</div>
 		<div id="archive">
@@ -2164,11 +1967,8 @@ function goToView(dest) {
 				<iframe onload="loadiFrame();" id="uploadtarget" name="uploadtarget" src="" style="display:none"></iframe>
 			</div></form>
 			<div><textarea id="composefield" onkeyup="showPreview();" autofocus="autofocus"></textarea></div>
-			<div><input id="postbutton" type="button" value="Post" onclick="sendPost();">&nbsp;&nbsp;
+			<div id="controlpanel"><input id="postbutton" type="button" value="Post" onclick="sendPost();">&nbsp;&nbsp;
 			<span id="supercheckpreview"><input id="previewcheck" type="checkbox" onclick="togglePreview(this);" /><label for="previewcheck" id="previewchecklabel">live preview&nbsp;&nbsp;</label></span><input id="alertcheck" type="checkbox" onclick="toggleAlert(this);" /><label for="alertcheck" id="alertchecklabel">play alert tone</label>
-			{% if gadget %}
-			&nbsp;&nbsp;<a onclick="expand();" href="javascript:window.open('http://savvychat.appspot.com');">Expand</a>
-			{% endif %}
 				</div></div>
 			<!--</form>-->
 		</div>
