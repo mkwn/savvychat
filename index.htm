@@ -82,6 +82,29 @@ shiftSend = false;
 {% endif %}
 }
 
+//http://codingrecipes.com/onmouseout-fix-on-nested-elements-javascript
+function is_child_of(parent, child){
+	if(child != null){
+		while(child.parentNode){
+			if((child = child.parentNode) == parent){
+				return true;
+			}
+		}
+	}
+	return false;
+}
+function fixOnMouseOut(element, event, JavaScript_code){
+	var current_mouse_target = null;
+	if(event.toElement){
+		current_mouse_target = event.toElement;
+	}else if(event.relatedTarget){
+		current_mouse_target = event.relatedTarget;
+	}
+	if(!is_child_of(element, current_mouse_target) && element != current_mouse_target){
+		eval(JavaScript_code);
+	}
+}
+
 //http://snipplr.com/view/3561/addclass-removeclass-hasclass/
 function hasClass(ele,cls) {
 	return ele.className.match(new RegExp('(\\s|^)'+cls+'(\\s|$)'));
@@ -1463,6 +1486,7 @@ function addDotPoints(savvyCode,compress){
 //helper function that puts a hash back into the text
 //has is tagged according to whether the code/math is isolated in a paragraph
 function interleave(parts, hash, startSepLine, endSepLine, startSepBlock, endSepBlock){
+
 	var progress = "";
 	while(hash.length > 0){
 		progress += parts.shift();
@@ -1737,9 +1761,14 @@ function fitWindow(){
 		for(var i = 0; i < images.length; i++){
 			images[i].style.width = "auto";
 			naturalWidth = images[i].offsetWidth;
+			naturalHeight = images[i].offsetHeight;
+			if (naturalHeight > 200){
+				images[i].style.width = (naturalWidth/naturalHeight*150)+"px";
+			}else{
 			images[i].style.width = "100%";
-			if(images[i].offsetWidth > naturalWidth){
-				images[i].style.width = "auto";
+				if(images[i].offsetWidth > naturalWidth){
+					images[i].style.width = "auto";
+				}
 			}
 		}
 	}
@@ -1947,7 +1976,7 @@ function goToView(dest) {
 			<div id="logoutTag"><a onclick="logout();return false;" href="{{ logouturl }}">Logout</a></div>
 		</div>
 		<div id="archive">
-		<div onmouseover="marquee();" onmouseout="unmarquee();" id="topic">{{ topic }}</div>
+		<div onmouseover="marquee();" onmouseout="fixOnMouseOut(this, event, 'unmarquee();');" id="topic">{{ topic }}</div>
 		<div id="postlist" onscroll="setScrollLock();">
 			{% if showarchive %}
 			<div id="viewarchivetag" class="post" style="text-align:center;font-weight:bold;margin-top:0;"><a href="" onclick="retrieveArchive();return false;">^ view older ^</a></div>

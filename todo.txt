@@ -1,5 +1,4 @@
 PRIORITY 0: DEFECTS
-in gadget mode, too tall, cant seem to change it
 tony can't scroll the savvychat window on his phone
 opens multiple refresh dialogs when post fails to send
 in IE7 ping check apparently fails
@@ -27,7 +26,6 @@ notify shouldn't join to non-notify
 
 PRIORITY 1: IMPORTANT
 allow manual resize of gadget
-autoresize tall pictures
 notify who you are calling
 multiple profiles
 dynamic aliases in help
