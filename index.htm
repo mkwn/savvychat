@@ -1762,14 +1762,14 @@ function fitWindow(){
 			images[i].style.width = "auto";
 			naturalWidth = images[i].offsetWidth;
 			naturalHeight = images[i].offsetHeight;
-			if (naturalHeight > 200){
-				images[i].style.width = (naturalWidth/naturalHeight*150)+"px";
-			}else{
+			var cap = naturalHeight > 200;
+			var capWidth = naturalWidth/naturalHeight*200;
 			images[i].style.width = "100%";
-				if(images[i].offsetWidth > naturalWidth){
-					images[i].style.width = "auto";
-				}
+			if(images[i].offsetWidth > naturalWidth || (cap && images[i].offsetWidth > capWidth)){
+				if(cap) images[i].style.width = capWidth+"px";
+				else images[i].style.width = "auto";
 			}
+		
 		}
 	}
 	if(widthchanged || wh != windowHeight()){
