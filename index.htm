@@ -13,12 +13,19 @@
 <link type="text/css" rel="stylesheet" href="/stylesheets/gadget.css" />
 {% endif %}
 <link type="text/css" rel="stylesheet" href="/stylesheets/{{ theme }}.css" />
-
 <!--[if lt IE 7]>
         <script type="text/javascript">alert("SavvyChat will almost certainly not work on your browser");</script>
 <![endif]-->
 <script type="text/javascript" src="json2.js"></script>
 <script type="text/javascript" src='/_ah/channel/jsapi'></script>
+
+{% if fixScroll %}
+<link type="text/css" rel="stylesheet" href="/fixScroll/jquery.jscrollpane.css" />
+<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.4/jquery.min.js"></script>
+<script type="text/javascript" src="/fixScroll/jquery.mousewheel.js"></script>
+<script type="text/javascript" src="/fixScroll/jquery.jscrollpane.min.js"></script>
+{% endif %}
+
 {% if not disableMath %}
 <script type="text/javascript" src="http://cdn.mathjax.org/mathjax/1.1-latest/MathJax.js">
 MathJax.Hub.Config({
@@ -47,6 +54,10 @@ var username = '{{ name }}';
 var disableAlert = false;
 {% if disableAlert %}
 disableAlert = true;
+{% endif %}
+var fixScroll = false;
+{% if fixScroll %}
+fixScroll = true;
 {% endif %}
 var gadget = false;
 {% if gadget %}
@@ -1661,11 +1672,13 @@ var scrollLocked = true;
 var autoscrolling = false;
 function scrolledDown(){
 	var posts = document.getElementById("postlist");
+	//if(fixScroll)	return scrollElement.data('jsp').getPercentScrolledY() == 1;
 	return posts.scrollTop == posts.scrollHeight - posts.offsetHeight;
 }
 
 //if user set the scroll to the bottom of the postlist, scroll down automatically
 function scrollDown(){
+	if(fixScroll) scrollElement.data('jsp').reinitialise();
 	var posts = document.getElementById("postlist");
 	if(posts.clientHeight < posts.scrollHeight){
 		//scrollbar
@@ -1675,6 +1688,7 @@ function scrollDown(){
 	}
 	if(scrollLocked){
 		autoscrolling = true;//flag so that onscroll doesn't get called again
+		//if(fixScroll) scrollElement.data('jsp').scrollToBottom();
 		posts.scrollTop = posts.scrollHeight - posts.offsetHeight;
 		autoscrolling = false;
 	}
@@ -1683,6 +1697,7 @@ function scrollDown(){
 function setScrollLock(){
 	if(!autoscrolling){
 		scrollLocked = scrolledDown();
+		//document.getElementById('topic').innerHTML=(new Date).getSeconds();
 	}
 }
 
@@ -1732,12 +1747,12 @@ function fitWindow(){
 		ww = windowWidth();
 		if(ww >= 900){
 			document.getElementById('content').style.width = "900px";
-			document.getElementById('postlist').style.width = "880px";
+			document.getElementById('postwrapper').style.width = "880px";
 			document.getElementById('composefield').style.width = "880px";
 			document.getElementById('content').style.borderWidth = Math.min(Math.round((ww - 900)/2), 3) + "px";
 		}else{
 			var padding = 20-20*gadget;
-			document.getElementById('postlist').style.width = ww - padding + "px";
+			document.getElementById('postwrapper').style.width = ww - padding + "px";
 			document.getElementById('composefield').style.width = ww - padding + "px";
 			document.getElementById('content').style.borderWidth = "0px";
 			document.getElementById('content').style.width = ww + "px";
@@ -1807,6 +1822,13 @@ function unmarquee(){
 
 function onLoadBody(){
 	//this is the stuff we want to call after all the page has been loaded
+	if(fixScroll){
+		$(function(){
+			scrollElement = $('.scroll-pane').jScrollPane();
+		});
+		//$('.scroll-pane').bind('jsp-arrow-change',setScrollLock)
+	}
+
 	MJQT("dummy");//hack to fix a mathjax bug
 		
 	//display all the elements that were hidden while loading
@@ -1977,14 +1999,14 @@ function goToView(dest) {
 		</div>
 		<div id="archive">
 		<div onmouseover="marquee();" onmouseout="fixOnMouseOut(this, event, 'unmarquee();');" id="topic">{{ topic }}</div>
-		<div id="postlist" onscroll="setScrollLock();">
+		<div id="postwrapper"><div class="scroll-pane" id="postlist"{% if not fixScroll %} onscroll="setScrollLock();"{% endif %}>
 			{% if showarchive %}
 			<div id="viewarchivetag" class="post" style="text-align:center;font-weight:bold;margin-top:0;"><a href="" onclick="retrieveArchive();return false;">^ view older ^</a></div>
 			{% endif %}
 			<div id="archivelist"></div>
 			
 			<div class="post" id="previewpost"><div id="previewlabel">(preview)</div><span class="author" id="authorpreview"></span><span class="postcontent" id="preview"></span></div>
-		</div>
+		</div></div>
 		</div>
 		<div id="compose">
 			<!--<form id="composeform" onsubmit="sendPost(); return false;">-->

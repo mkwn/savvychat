@@ -14,6 +14,9 @@ handlers:
   static_files: json2.js
   upload: json2.js
 
+- url: /fixScroll
+  static_dir: fixScroll
+
 - url: /sounds
   static_dir: sounds
   

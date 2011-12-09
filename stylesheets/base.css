@@ -108,7 +108,6 @@ blockquote{
 #postlist{
 	overflow: auto;
 	overflow-x: hidden;
-	width: 880px;
 	height: 400px;
 }
 

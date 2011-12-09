@@ -67,8 +67,9 @@ class Chatuser(db.Model):
 class File(db.Model):
 	#for file upload
 	type = db.StringProperty()
-	#name = db.StringProperty()
+	name = db.StringProperty()
 	data = db.BlobProperty()
+	date = db.DateTimeProperty(auto_now_add=True)
 
 class Whiteuser(db.Model):
 	#whitelisted users
@@ -133,6 +134,19 @@ def decompressHTML(html):
 	for p in pairs:
 		workhtml = workhtml.replace(p[0],p[1])
 	return workhtml
+
+def sendMail(to, subject, body, html=None, senderName='SavvyChat Mailer', senderMail='mailer'):
+	netloc = getNetloc()
+	netlocData = netloc.split('.')
+	if len(netlocData) > 2 and netlocData[-2]=="appspot":
+		hostname = netlocData[-3]
+		params = {"sender":senderName+" <"+senderMail+"@"+hostname+".appspotmail.com>",
+			"to":to,
+			"subject":subject,
+			"body":body}
+		if html is not None:
+			params["html"] = html
+		mail.send_mail(**params)
 		
 def call(self,recipients=[], author="a user", plaincontent="", htmlcontent=""):
 	if recipients == []:
@@ -152,23 +166,35 @@ def call(self,recipients=[], author="a user", plaincontent="", htmlcontent=""):
 				TOarray = TOarray + [chatuser.name + ' <' + chatuser.email + '>']
 	if TOarray == []:
 		return
-	netloc = getNetloc(self).split('.')
-	if len(netloc) >2 and netloc[-2]=="appspot":
-		sender = netloc[-3]
-		mail.send_mail(sender='SavvyChat Mailer <mailer@'+sender+'.appspotmail.com>',
-					to=', '.join(TOarray),
-					subject="You have been called by "+author+" with SavvyChat",
-					body=plaincontent,
-					html=htmlcontent)
+	sendMail(to=', '.join(TOarray),
+		subject="You have been called by "+author+" with SavvyChat",
+		body=plaincontent,
+		html=htmlcontent)
+	netloc = getNetloc().split('.')
 
 def removeWhitespace(data):
 	return ''.join(data.split())
 		
 def resolveStragglers():
+	setMC = False
+	lastFlush = memcache.get("lastFlush")
+	if not lastFlush:
+		setMC = True
+		lastFlush = Global.get("lastFlush")
+		if not lastFlush:
+			lastFlush = "1"
+	lastFlushInt = int(lastFlush)
+	nowInt = int(time.mktime(datetime.utcnow().timetuple()))
+	if setMC:
+		memcache.add(key="lastFlush", value=lastFlush)
+	
+	if nowInt-lastFlushInt < 60*60:
+		return
 	#if a computer crashes, they will not be able to send the onClose message
 	#look for users with no updates in 2 hours and close them
 	chatusers = db.GqlQuery("SELECT * FROM Chatuser")
 	now = datetime.now()
+
 	for chatuser in chatusers:
 		expired = False
 		for idx, lastrefresh in enumerate(chatuser.lastrefreshlist):
@@ -178,7 +204,27 @@ def resolveStragglers():
 				expired = True
 		if expired:
 			chatuser.put()
+
+	memcache.set(key="lastFlush", value=str(nowInt))
+	Global.set("lastFlush", str(nowInt))
 		
+def checkDump():
+	#check if its been about a day since the last dump
+	#get start time
+	try:
+		startInt = int(Global.get("lastDump"))
+	except TypeError:
+		firstPost=db.GqlQuery("SELECT * FROM Post ORDER BY date ASC").get()
+		if firstPost is None:
+			return
+		else:
+			startInt = int(time.mktime(firstPost.date.timetuple()))
+
+	#get end time
+	endInt = int(time.mktime(datetime.utcnow().timetuple()))
+	if endInt-startInt > 24*60*60:
+		sendMail(to="mattk210@gmail.com", body=dump(startInt,endInt), subject='SavvyChat Post Dump')
+
 def hlog(text):
 	#hacky log
 	doPost(str(text),"hlog")
@@ -269,26 +315,12 @@ def declareUpdate(self):
 	Global.set("lastUpdate",str(lastDate))
 	return self.response.out.write("done")
 
-def dump(self):
-	#make a dump of all posts
-	#get start time
-	try:
-		startInt = int(Global.get("lastDump"))
-	except ValueError:
-		startInt = int(time.mktime(db.GqlQuery("SELECT * FROM Post ORDER BY date ASC").get().date.timetuple()))
-	startArg = self.request.get('s')
-	if startArg:
-		startInt = int(startArg)
-	startDate = datetime.fromtimestamp(startInt)
-	
-	#get end time
-	endInt = int(time.mktime(datetime.utcnow().timetuple()))
-	endArg = self.request.get('e')
-	if endArg:
-		endInt = int(endArg)
+def dump(startInt, endInt):
 	if endInt - startInt > 1000000 or endInt <  startInt:
 		#request will probably time out, we need to cut the interval
 		endInt = startInt + 1000000
+
+	startDate = datetime.fromtimestamp(startInt)
 	endDate = datetime.fromtimestamp(endInt)
 
 	outString = "This is a dump of all posts from " + str(startDate) + " to " + str(endDate) + ".\n(UNIX timestamps " + str(startInt) + "-" + str(endInt) + ")."
@@ -304,9 +336,32 @@ def dump(self):
 		except AttributeError:
 			authorString = post.author
 		outString += "\n\n" + authorString + " @ " + dateString + ":\n" + post.content
-	self.response.headers['Content-Type'] = "text/plain"
-	self.response.out.write(outString)
 	Global.set("lastDump", str(endInt))
+	return outString
+
+def manualDump(self):
+	#make a dump of all posts
+	#get start time
+	try:
+		startInt = int(Global.get("lastDump"))
+	except TypeError:
+		firstPost=db.GqlQuery("SELECT * FROM Post ORDER BY date ASC").get()
+		if firstPost is None:
+			return
+		else:
+			startInt = int(time.mktime(firstPost.date.timetuple()))
+	startArg = self.request.get('s')
+	if startArg:
+		startInt = int(startArg)
+	
+	#get end time
+	endInt = int(time.mktime(datetime.utcnow().timetuple()))
+	endArg = self.request.get('e')
+	if endArg:
+		endInt = int(endArg)
+
+	self.response.headers['Content-Type'] = "text/plain"
+	return self.response.out.write(dump(startInt, endInt))
 
 def initWhite(self):
 	whitelistData = open("whitelist.txt")
@@ -325,8 +380,15 @@ def initWhite(self):
 		whiteuser.put()
 	return self.response.out.write("done")
 
-def getNetloc(self):
-	return urlparse.urlsplit(self.request.url)[1]
+def initNetloc(self):
+	return Global.set("netloc", urlparse.urlsplit(self.request.url)[1])
+
+def getNetloc():
+	netloc = Global.get("netloc")
+	if not netloc:
+		Global.set("netloc","savvychat")
+		netloc = "savvychat.appspot.com"
+	return netloc
 
 class PostPage(webapp.RequestHandler):
 	def post(self):
@@ -589,6 +651,10 @@ class MainPage(webapp.RequestHandler):
 		else:
 			lastUpdate = " Last updated on " + lastUpdate + "."
 		
+		fixScroll = False
+		if self.request.get('fixScroll'):
+			fixScroll = True
+
 		disableMath = False
 		if self.request.get('disableMath'):
 			disableMath = True
@@ -632,6 +698,7 @@ class MainPage(webapp.RequestHandler):
 							'libs':libs,
 							'container':container,
 							'disableMath':disableMath,
+							'fixScroll':fixScroll,
 							'suppressErrors':suppressErrors,
 							'theme':theme}
 		self.response.out.write(template.render('index.htm', template_values))
@@ -649,28 +716,30 @@ class AdminPage(webapp.RequestHandler):
 
 		typeString = self.request.get('type')
 		if not typeString:
-			return self.response.out.write('<a href="?type=dump">Dump posts</a><br /><a href="?type=white">Initialize whitelist</a><br /><a href="?type=date">Declare update</a>')
+			return self.response.out.write('<a href="?type=dump">Dump posts</a><br /><a href="?type=white">Initialize whitelist</a><br /><a href="?type=date">Declare update</a><br /><a href="?type=netloc">Initialize netloc</a>')
 		if typeString == "dump":
-			return dump(self)
+			return manualDump(self)
 		if typeString == "white":
 			return initWhite(self)
 		if typeString == "date":
 			return declareUpdate(self)
+		if typeString == "netloc":
+			return initNetloc(self)
 
 class UploadPage(webapp.RequestHandler):
 	def post(self):
 		fileobj = self.request.POST["file"]
+		#internet explorer gives full path, reduce it:
+		filename = urllib.quote_plus(re.sub(r"^.*\\","",fileobj.filename))
 		file = File()
 		file.data = fileobj.value
 		file.type = fileobj.type
-		#file.name = fileobj.filename
+		file.name = filename
 		try:
 			file.put()
 		except:
 			doPost("|notify|File upload failed","SavvyChat")
 			return
-		#internet explorer gives full path, reduce it:
-		filename = urllib.quote_plus(re.sub(r"^.*\\","",fileobj.filename))
 		path = "download/"+str(file.key().id()) + "/" + filename
 		fullpath = "http://" + self.request.host + "/" + path
 		post = "[[" + fullpath+ "]]"
@@ -693,12 +762,12 @@ class GadgetXMLPage(webapp.RequestHandler):
 		disableMath = False
 		if self.request.get('disableMath'):
 			disableMath = True
-		template_values = {'netloc':getNetloc(self),'disableMath':disableMath}
+		template_values = {'netloc':getNetloc(),'disableMath':disableMath}
 		return self.response.out.write(template.render('gadget.xml', template_values))
 
 class HelpPage(webapp.RequestHandler):
 	def get(self):
-		return self.response.out.write(template.render('help.htm', {'netloc':getNetloc(self)}))
+		return self.response.out.write(template.render('help.htm', {'netloc':getNetloc()}))
 		
 application = webapp.WSGIApplication([
 									('/', MainPage),
@@ -718,6 +787,7 @@ application = webapp.WSGIApplication([
 
 def main():
 	resolveStragglers()
+	checkDump()
 	run_wsgi_app(application)
 
 if __name__ == "__main__":

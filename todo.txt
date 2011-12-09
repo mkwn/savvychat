@@ -1,5 +1,8 @@
 PRIORITY 0: DEFECTS
-tony can't scroll the savvychat window on his phone
+fixed width font for dumps
+allow only 1 token per user
+reuse tokens
+monitor whos using up all the tokens
 opens multiple refresh dialogs when post fails to send
 in IE7 ping check apparently fails
 call abort() when an error page is returned
@@ -29,7 +32,6 @@ allow manual resize of gadget
 notify who you are calling
 multiple profiles
 dynamic aliases in help
-store filename with files
 can't really see grey on black background for gadget
 themes
 	clean up themes code
@@ -72,6 +74,7 @@ press up in empty textbox to get last message
 queue posts with verify instead of disabling send
 
 PRIORITY 2: COMPLICATED
+backup mode for when over quota
 recognize and collapse conversations
 write a real parser
 allow to invite guest
