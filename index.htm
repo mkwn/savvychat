@@ -175,34 +175,34 @@ function openChannel(){
 var excess = 0;
 //send any message to server
 function sendMessage(path, opt){
-		path = validateMessage(path, opt);
-		if(!path){
-			return false;
+	path = validateMessage(path, opt);
+	if(!path){
+		return false;
+	}
+	//syncing=true;displayNote(path);syncing=false;
+	var xhr = new XMLHttpRequest();
+	xhr.open('POST', path, true);
+	xhr.send();
+	var abort = function(){
+		xhr.abort();
+		if(opt && opt.abort){
+			opt.abort();
+		}else{
+			onClose();
 		}
-		//syncing=true;displayNote(path);syncing=false;
-		var xhr = new XMLHttpRequest();
-		xhr.open('POST', path, true);
-		xhr.send();
-		var abort = function(){
-			xhr.abort();
-			if(opt && opt.abort){
-				opt.abort();
-			}else{
-				onClose();
+	};
+	var AJAXTimeout = setTimeout(abort, 20*1000);
+	xhr.onreadystatechange = function(){
+		if(xhr.readyState == 4){
+			clearTimeout(AJAXTimeout);
+			xhr.onreadystatechange = function(){};
+			if(opt && opt.callback){
+				if(!xhr.responseText) return abort();
+				opt.callback(xhr.responseText);
 			}
-		};
-		var AJAXTimeout = setTimeout(abort, 20*1000);
-		xhr.onreadystatechange = function(){
-			if(xhr.readyState == 4){
-				clearTimeout(AJAXTimeout);
-				xhr.onreadystatechange = function(){};
-				if(opt && opt.callback){
-					if(!xhr.responseText) return abort();
-					opt.callback(xhr.responseText);
-				}
-			}
-		};
-		return xhr;
+		}
+	};
+	return xhr;
 }
 
 function closeMessage(){
@@ -262,7 +262,7 @@ function refreshToken(time, bypass){
 	allowSend(false,"error");
 	connectionError = true;
 	authError = false
-	clearInterval(refreshTimeout);
+	clearTimeout(refreshTimeout);
 	socket.onclose = function(){};
 	socket.onerror = function(){};
 	socket.close();
@@ -300,6 +300,9 @@ function refreshToken(time, bypass){
 		//displayNote("Reconnect failed. Retrying in "+time+" seconds. [[Try now@@javascript:clearTimeout(refreshTimeout);refreshToken(1, true);]]");
 		displayNote("Reconnect failed. [[Try now@@javascript:clearTimeout(refreshTimeout);refreshToken(1, true);]]");
 		clearTimeout(refreshTimeout);
+		clearTimeout(expectPingTimeout);
+		clearTimeout(expectPostTimeout);
+		clearTimeout(checkTimeout);
 		//refreshTimeout = setTimeout("refreshToken("+Math.min(time*2,60)+", true);",time*1000);
 		return;
 	}
@@ -314,8 +317,8 @@ function refreshToken(time, bypass){
 //when the connection expires
 function onClose(){
 	{% if suppressErrors %}return;{% endif %}
-	clearTimeout(expectTimeout);
-	clearTimeout(expectTimeoutPost);
+	clearTimeout(expectPingTimeout);
+	clearTimeout(expectPostTimeout);
 	clearTimeout(checkTimeout);
 	if(connectionError || authError) return;
 	displayNote("Connection error. Savvychat is attempting to refresh your connection. If this doesn't work, please [[reload SavvyChat@@javascript:closeMessage();location.reload();]].");
@@ -405,7 +408,7 @@ function gotCalled(post){
 }
 
 var alerted = false;
-var expectTimeoutPost = null;
+var expectPostTimeout = null;
 //on recieving any message from the server
 function onMessage(message){
 
@@ -415,7 +418,7 @@ function onMessage(message){
 	
 	var m = JSON.parse(message.data);
 	if(m.content){
-		clearTimeout(expectTimeoutPost);
+		clearTimeout(expectPostTimeout);
 		if(syncing){
 			syncInterrupt = true;
 			return;
@@ -440,7 +443,7 @@ function onMessage(message){
 		return;
 	}
 	if(m.ping){
-		clearTimeout(expectTimeout);
+		clearTimeout(expectPingTimeout);
 		if(notifyPing){
 			d = new Date();
 			note = "Successful ping. Latency was " + (d.getTime()-pingStart) + "ms.";
@@ -609,7 +612,6 @@ function sendPost(){
 				displayNote(note);
 				failNotify.push(noteLog.length - 1);
 				onClose();
-				onClose();
 			};
 			sendMessage('/call', {param: 'h=' + enchtml + '&r=' + encrec});
 		}
@@ -622,8 +624,8 @@ function sendPost(){
 		var blockSize = enctext.length - excess; //i don't want to hardcode it in case i change something in sendMessage
 		processParts(partNo, blockSize, text, enctext)
 	}
-	clearTimeout(expectTimeoutPost);
-	expectTimeoutPost = setTimeout("onClose();",10*1000);
+	clearTimeout(expectPostTimeout);
+	expectPostTimeout = setTimeout("onClose();",20*1000);
 	document.getElementById("preview").innerHTML = "";
 	//showPreview(true);
 	document.getElementById("authorpreview").innerHTML = username + ":";
@@ -733,7 +735,7 @@ function sync(){
 	syncInterrupt = false;
 }
 
-var expectTimeout = null;
+var expectPingTimeout = null;
 var pinging = false;
 var notifyPing = false;
 var pingStart;
@@ -756,8 +758,8 @@ function ping(notify){
 	sendMessage('/ping', {param: 't=' + tokenid, abort:abort, callback:callback});
 	d = new Date();
 	pingStart = d.getTime();
-	clearTimeout(expectTimeout);
-	expectTimeout = setTimeout("pinging=false;onClose();",10*1000);
+	clearTimeout(expectPingTimeout);
+	expectPingTimeout = setTimeout("pinging=false;onClose();",20*1000);
 	if(notify){
 		//notify
 	}

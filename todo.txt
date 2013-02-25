@@ -1,4 +1,5 @@
 PRIORITY 0: DEFECTS
+tons of disconnects
 fixed width font for dumps
 allow only 1 token per user
 reuse tokens
