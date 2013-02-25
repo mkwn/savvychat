@@ -191,7 +191,7 @@ function sendMessage(path, opt){
 				onClose();
 			}
 		};
-		var AJAXTimeout = setTimeout(abort, 10*1000);
+		var AJAXTimeout = setTimeout(abort, 20*1000);
 		xhr.onreadystatechange = function(){
 			if(xhr.readyState == 4){
 				clearTimeout(AJAXTimeout);
@@ -297,9 +297,10 @@ function refreshToken(time, bypass){
 		refreshing = false;
 		document.title = "! SavvyChat";
 		alerted = false;
-		displayNote("Reconnect failed. Retrying in "+time+" seconds. [[Try now@@javascript:clearTimeout(refreshTimeout);refreshToken(1, true);]]");
+		//displayNote("Reconnect failed. Retrying in "+time+" seconds. [[Try now@@javascript:clearTimeout(refreshTimeout);refreshToken(1, true);]]");
+		displayNote("Reconnect failed. [[Try now@@javascript:clearTimeout(refreshTimeout);refreshToken(1, true);]]");
 		clearTimeout(refreshTimeout);
-		refreshTimeout = setTimeout("refreshToken("+Math.min(time*2,60)+", true);",time*1000);
+		//refreshTimeout = setTimeout("refreshToken("+Math.min(time*2,60)+", true);",time*1000);
 		return;
 	}
 	sendMessage('/token',{callback:callback, param: 't=' + tokenid, abort:abort});
@@ -1286,6 +1287,7 @@ function getHTMLfromSavvyCode(savvyCode, domath, author, compress){
 			//
 			break;
 		case "cont":
+
 			//
 			break;
 			
