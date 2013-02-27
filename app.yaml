@@ -10,9 +10,9 @@ handlers:
 - url: /icons
   static_dir: icons
 
-- url: /json2.js
-  static_files: json2.js
-  upload: json2.js
+- url: /jquery-1.9.1.min.js
+  static_files: jquery-1.9.1.min.js
+  upload: jquery-1.9.1.min.js
 
 - url: /fixScroll
   static_dir: fixScroll

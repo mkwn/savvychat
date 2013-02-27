@@ -1,14 +1,11 @@
 PRIORITY 0: DEFECTS
-tons of disconnects
 fixed width font for dumps
 allow only 1 token per user
 reuse tokens
 monitor whos using up all the tokens
-opens multiple refresh dialogs when post fails to send
 in IE7 ping check apparently fails
 call abort() when an error page is returned
 set icon before page load?
-sometimes i get connection error without timeout refresh
 consider implications of deadline error
 james is getting freezes on math load
 ping function to check whether connection is active, especially after disconnect

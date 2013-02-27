@@ -637,7 +637,7 @@ class MainPage(webapp.RequestHandler):
 		subtitleData.close()
 		
 		#determine options
-		disableAlert = not chatuser.playtone
+		playTone = chatuser.playtone
 		shiftSend = chatuser.shiftsend
 		hf = chatuser.hf
 		
@@ -650,10 +650,6 @@ class MainPage(webapp.RequestHandler):
 			lastUpdate = ""
 		else:
 			lastUpdate = " Last updated on " + lastUpdate + "."
-		
-		fixScroll = False
-		if self.request.get('fixScroll'):
-			fixScroll = True
 
 		disableMath = False
 		if self.request.get('disableMath'):
@@ -676,6 +672,7 @@ class MainPage(webapp.RequestHandler):
 			v = self.request.get('v')
 			container = self.request.get('container')
 			libs = self.request.get('libs')
+			theme = "gadget"
 		
 		#inject template values and render
 		template_values = {'token': token,
@@ -690,7 +687,7 @@ class MainPage(webapp.RequestHandler):
 							'showarchive':showarchive,
 							'startquerycursor':startquerycursor,
 							'endquerycursor':endquerycursor,
-							'disableAlert':disableAlert,
+							'playTone':playTone,
 							'shiftSend':shiftSend,
 							'hf':hf,
 							'gadget':gadget,
@@ -698,7 +695,6 @@ class MainPage(webapp.RequestHandler):
 							'libs':libs,
 							'container':container,
 							'disableMath':disableMath,
-							'fixScroll':fixScroll,
 							'suppressErrors':suppressErrors,
 							'theme':theme}
 		self.response.out.write(template.render('index.htm', template_values))
