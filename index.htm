@@ -301,9 +301,7 @@ function setIcon(path){
 	if(version<9){
 		return;
 	}
-	
-	if(!path) path = "favicon.ico";
-	
+		
 	newIconLink(path,"icon","icon");
 	newIconLink(path,"sicon","shortcut icon");
 	
@@ -388,6 +386,52 @@ function logout(){
 	location.href="{{ logouturl }}";
 }
 
+var commands = [];
+function newCommand(tag, preview, action){
+	commands.push({tag:tag,preview:preview,action:action});
+}
+
+newCommand("logout",function(){return "log out";},logout);
+
+newCommand("help",function(){return "show help";},openHelp);
+
+newCommand("hf",function(){return verbose?"hide header and footer":"show header and footer as normal";},function(){
+	verbose = !verbose;
+	sendMessage('/options', {type:"hf",h:verbose});
+	wh = 0;//force a refit
+	fitWindow();
+});
+
+newCommand("shift",function(){return "change the send shortcut to "+(shiftSend?"ENTER":"SHIFT+ENTER");},function(){
+	shiftSend = !shiftSend;
+	updatePostText();
+	sendMessage('/options', {type:"shiftsend",s:shiftSend});
+});
+
+newCommand("tone",function(){return (playTone?"disable":"enable")+" the alert tone";},function(){
+	var checkbox = $("#alertcheck")[0];
+	checkbox.checked = !checkbox.checked;
+	toggleAlert(checkbox);
+});
+
+newCommand("mute",function(){return (mute?"unmute":"mute")+" all sounds";},function(){mute = !mute;});
+
+newCommand("preview",function(){return (mathpreview?"disable":"enable")+" the preview";},function(){
+	var checkbox = $("#previewcheck")[0];
+	checkbox.checked = !checkbox.checked;
+	togglePreview(checkbox);
+});
+
+newCommand("math",function(){return (dopreview?"disable":"enable")+" live previewing of math";},function(){mathpreview = !mathpreview;});
+
+newCommand("sync",function(){return syncing?"!Syncing in progress, command disabled":"synchronize the discussion in case you failed to recieve some messages";},function(){sync();});
+
+newCommand("ping",function(){return pinging?"!Pinging in progress, command disabled":"check whether the channel is open";},function(){ping(true);});
+
+newCommand("refresh",function(){return refreshing?"!Refreshing in progress, command disabled":"request anew channel token to refresh the connection";},function(){refreshToken();});
+
+newCommand("upload",function(){return "open upload dialog";},function(){showUpload();});
+
 var backupText = "";
 var showingLog = false;
 //send a new post to the server
@@ -401,92 +445,12 @@ function sendPost(){
 		//worktext = RegExp.$3;
 		meta = meta.toLowerCase().replace(/\s/g,"");
 		metahead = meta.split(":")[0]
-
-		switch(metahead){
-		case "logout":
-			//logout
-			logout();
-			return;
-			break;
-		case "hf":
-			//header and footer
-			verbose = !verbose;
-			sendMessage('/options', {type:"hf",h:verbose});
-			wh = 0;//force a refit
-			fitWindow();
-			return showPreview(true);
-			break;
-		case "shift":
-			//header and footer
-			shiftSend = !shiftSend;
-			updatePostText();
-			sendMessage('/options', {type:"shiftsend",s:shiftSend});
-			return showPreview(true);
-			break;
-		case "help":
-			openHelp();
-			return;
-			break;
-		case "tone":
-			//alert tone
-			document.getElementById("alertcheck").checked = !document.getElementById("alertcheck").checked;
-			toggleAlert(document.getElementById("alertcheck"));
-			return showPreview(true);
-			break;
-		case "mute":
-			mute = !mute;
-			return showPreview(true);
-			break;
-		case "preview":
-			//toggle preview
-			document.getElementById("previewcheck").checked = !document.getElementById("previewcheck").checked;
-			togglePreview(document.getElementById("previewcheck"));
-			return;
-			break;
-		case "math":
-			//math in preview
-			mathpreview = !mathpreview;
-			return showPreview(true);
-			break;
-		case "archive":
-			//retrieve archive
-			var numPosts = parseInt(meta.split(":")[1],10);
-			if(!numPosts) numPosts = 20;
-			retrieveArchive(numPosts);
-			return showPreview(true);
-			break;
-		case "sync":
-			sync();
-			return;
-			break;
-		case "ping":
-			ping(true);
-			return;
-			break;
-		case "notes":
-			showingLog = true;
-			displayNote("**Start of notification log**",true);
-			for(note in noteLog){
-				displayNote(noteLog[note],true);
+		
+		for(command in commands){
+			if (commands[command].tag == metahead){
+				commands[command].action();
+				return showPreview(true);
 			}
-			displayNote("**End of notification log**",true);
-			noteLog.push("Viewed notification log (snipped)");
-			showingLog = false;
-			return;
-			break;
-		case "refresh":
-			refreshToken();
-			return;
-			break;
-		case "flush":
-			flushTokens();
-			return;
-			break;
-		case "upload":
-			//open upload dialog box
-			showUpload();
-			return;
-			break;
 		}
 	}
 	
@@ -618,9 +582,6 @@ function ping(notify){
 	if(notify){
 		//notify
 	}
-}
-
-function flushTokens(){
 }
 
 //process the archive
@@ -1025,6 +986,16 @@ function getHTMLfromSavvyCode(savvyCode, domath, author, compress){
 		var parts = meta.split(":");
 		metahead = parts[0]
 		var str;//helper string for some options
+
+		for(command in commands){
+			if (commands[command].tag == metahead){
+				var text = commands[command].preview();
+				if(text.substring(0,1) != '!')
+					text = "Special command to "+text+" (will not send)";
+				return {meta:commands[command].tag,html:"<strong>"+text+"</strong>", authortext:authortext};
+			}
+		}
+
 		switch (metahead){
 		case "topic":
 			//topics don't have any multiline stuff
@@ -1050,87 +1021,6 @@ function getHTMLfromSavvyCode(savvyCode, domath, author, compress){
 				recipientText = parts.join(":").replace(/,/g,", ");
 			}
 			authortext = author + " calls "+ recipientText + ": ";
-			break;
-		case "notify":
-			//
-			break;
-		case "cont":
-
-			//
-			break;
-			
-		//check for options
-		case "logout":
-			return {meta:'logout',html:'<strong>Special command to log out (will not send)</strong>', authortext:authortext};
-			break;
-		case "help":
-			return {meta:'help',html:'<strong>Special command to show help (will not send)</strong>', authortext:authortext};
-			break;
-		case "hf":
-			str = "hide header and footer";
-			if(!verbose) str = "show header and footer as normal";
-			return {meta:'hf',html:'<strong>Special command to '+str+' (will not send)</strong>', authortext:authortext};
-			break;
-		case "shift":
-			str = "change the send shortcut to SHIFT+ENTER";
-			if(shiftSend) str = "change the send shortcut to ENTER";
-			return {meta:'shift',html:'<strong>Special command to '+str+' (will not send)</strong>', authortext:authortext};
-			break;
-		case "tone":
-			str = "enable";
-			if(playTone) str = "disable";
-			return {meta:'tone',html:'<strong>Special command to '+str+' the alert tone (will not send)</strong>', authortext:authortext};
-			break;
-		case "mute":
-			str = "mute";
-			if(mute) str = "unmute";
-			return {meta:'tone',html:'<strong>Special command to '+str+' all sounds, including the call tone (will not send)</strong>', authortext:authortext};
-			break;
-		case "preview":
-			str = "enable"
-			if(dopreview)str = "disable";
-			return {meta:'preview',html:'<strong>Special command to '+str+' the preview (will not send)</strong>', authortext:authortext};
-			break;
-		case "math":
-			str = "enable"
-			if(mathpreview)str = "disable";
-			return {meta:'math',html:'<strong>Special command to '+str+' live previewing of math (will not send)</strong>', authortext:authortext};
-			break;
-		case "archive":
-			var numPosts = Math.min(parseInt(meta.split(":")[1],10),1000);
-			if(!numPosts) numPosts = 20;
-			str = 'Special command to retrieve the last '+numPosts+' posts in the archive';
-			if(retrieving||denyretrieve)str = "Archive retrieval denied, command disabled";
-			return {meta:'archive',html:'<strong>'+str+' (will not send)</strong>', authortext:authortext};
-			break;
-		case "sync":
-			str = 'Special command to synchronize the discussion in case you failed to recieve some messages';
-			if(syncing)str = "Syncing in progress, command disabled";
-			return {meta:'sync',html:'<strong>'+str+' (will not send)</strong>', authortext:authortext};
-			break;
-		case "ping":
-			str = 'Special command to check whether the channel is open';
-			if(pinging)str = "Pinging in progress, command disabled";
-			return {meta:'ping',html:'<strong>'+str+' (will not send)</strong>', authortext:authortext};
-			break;
-		case "notes":
-			str = 'Special command to view all notifications from this session';
-			return {meta:'notes',html:'<strong>'+str+' (will not send)</strong>', authortext:authortext};
-			break;
-		case "refresh":
-			str = 'Special command to request new channel token to refresh connection';
-			if(refreshing)str = "Refreshing in progress, command disabled";
-			return {meta:'refresh',html:'<strong>'+str+' (will not send)</strong>', authortext:authortext};
-			break;
-		case "flush":
-			str = 'Special command to clear all connections with your user ID';
-			return {meta:'flush',html:'<strong>'+str+' (will not send)</strong>', authortext:authortext};
-			break;
-		case "upload":
-			return {meta:'upload',html:'<strong>Special command to open upload dialog (will not send)</strong>', authortext:authortext};
-			break;
-		default:
-			return {meta:meta,html:'<strong>Unknown tag &quot;'+parts[0]+'&quot;</span></strong>', authortext:authortext};
 			break;
 		}
 	}
@@ -1667,7 +1557,7 @@ function onLoadBody(){
 		recievePost({author:ip[i].childNodes[0].innerHTML, content:unescapedContent, date:ip[i].childNodes[2].innerHTML, recipients:recipients},true);
 	}
 	
-	setIcon();//maybe this should be *before* page load...
+	setIcon("favicon.ico");//maybe this should be *before* page load...
 	
 	openChannel();
 }
