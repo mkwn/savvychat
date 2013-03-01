@@ -59,6 +59,7 @@ var windowFocus = true;
 var mute = false;
 
 var channelWaitLeniency = 10*1000;
+$.ajaxSetup({timeout:10*1000});
 var connectionCheckInterval = 5*60*1000;
 
 //http://codingrecipes.com/onmouseout-fix-on-nested-elements-javascript
@@ -144,16 +145,13 @@ function openChannel(){
 function sendMessage(path, data, callback, abort){
 	if(!data) $.post(path);
 	var success = function(response){
-		console.log(path);
 		if(callback) callback(response);
-		console.log("WORKING");
 	};
 	var fail = function(){
 		if(abort) abort();
-		else onClose();
-		console.log("BAD");
+		ajaxFail();
 	};
-	$.post(path,data,success).fail = fail;
+	$.post(path,data,success).fail(fail)
 }
 
 function closeMessage(){
@@ -203,7 +201,6 @@ function refreshToken(time, bypass){
 	socket.onerror = function(){};
 	socket.close();
 	var callback = function(response){
-		console.log(response);
 		refreshing = false;
 		inRefreshSequence = false;
 		var arr = response.split("@@")
@@ -238,7 +235,6 @@ function refreshToken(time, bypass){
 		displayNote("Reconnect failed. [[Try now@@javascript:clearTimeout(refreshTimeout);refreshToken(1, true);]]");
 		clearTimeout(refreshTimeout);
 		clearTimeout(expectPingTimeout);
-		clearTimeout(expectPostTimeout);
 		clearTimeout(checkConnectionTimeout);
 		//refreshTimeout = setTimeout("refreshToken("+Math.min(time*2,60)+", true);",time*1000);
 		return;
@@ -247,15 +243,33 @@ function refreshToken(time, bypass){
 	allowSend(false,"error");
 }
 
-//when the connection fails
+//when the channel connection fails
 function onClose(){
 	{% if suppressErrors %}return;{% endif %}
 	clearTimeout(expectPingTimeout);
-	clearTimeout(expectPostTimeout);
+	for(var post in expectedPosts){
+		clearTimeout(expectedPosts[post].timeout)
+	}
 	clearTimeout(checkConnectionTimeout);
 	if(connectionError || authError) return;
-	displayNote("Connection error. Savvychat is attempting to refresh your connection. If this doesn't work, please [[reload SavvyChat@@javascript:closeMessage();location.reload();]].");
+	displayNote("Communication channel closed. SavvyChat is attempting to refresh your connection. If this doesn't work, please [[reload the page@@javascript:closeMessage();location.reload();]].");
 	refreshToken(1);
+}
+
+var suppressChannelFail = false;
+function channelFail(){
+	if(suppressChannelFail) return;
+	if(connectionError || authError) return;
+	displayNote("SavvyChat's communication channel seems slow, flaky or broken. Maybe you want to [[refresh the channel connection@@javascript:onClose();]] or [[reload the page@@javascript:closeMessage();location.reload();]]. Click [[here@@javascript:suppressChannelFail=true;]] to make these warnings stop happening.");
+}
+
+var suppressAjaxFail = false;
+function ajaxFail(){
+	if(suppressAjaxFail) return;
+	if(inRefreshSequence) return;
+	if(connectionError || authError) return;
+	displayNote("Some request failed or timed out. Maybe you want to [[refresh the channel connection@@javascript:onClose();]] or [[reload the page@@javascript:closeMessage();location.reload();]]. Click [[here@@javascript:suppressAjaxFail=true;]] to make these warnings stop happening.");
+	onClose();
 }
 
 var noteLog = [];
@@ -263,7 +277,7 @@ function displayNote(post, skipLog){
 	if(post.constructor == String)
 		post = {content:post, author:"SavvyChat", date:new Date(), recipients:[]};
 	if(!skipLog) noteLog.push(post);
-	recievePost(post,false,true);
+	receivePost(post,false,true);
 }
 
 var sounds = {};
@@ -339,8 +353,9 @@ function gotCalled(post){
 }
 
 var alerted = false;
-var expectPostTimeout = null;
 //on recieving any message from the server
+var receivedPostIDs = [];
+
 function onMessage(message){
 
 	//every 5 minutes we should try a ping
@@ -349,16 +364,13 @@ function onMessage(message){
 	
 	var m = $.parseJSON(message.data);
 
-	var latency1 = -1;
-	var latency2 = -1;
-
 	if(m.content){
 		if(syncing){
 			syncInterrupt = true;
 			return;
 		}
 		//this was a post
-		recievePost(m);
+		receivePost(m);
 		//play a special tone when someone calls you, no matter what
 		if(gotCalled(m)&&!mute){
 			//play the tone
@@ -374,13 +386,13 @@ function onMessage(message){
 			alerted = true;
 		}
 
+		receivedPostIDs.push(m.id);
+
 		for(var post in expectedPosts){
-			var postObject = expectedPosts[post]
-			if(postObject.id == m.id) {
-				clearTimeout(postObject.timeout);
-				latency1 = (new Date()).getTime()-postObject.responseTime;
-				latency2 = postObject.responseTime-postObject.startTime;
-				expectedPosts.splice(postObject.index,1);
+			var postObj = expectedPosts[post]
+			if(postObj.id == m.id) {
+				clearTimeout(postObj.timeout);
+				delete postObj;
 				break;
 			}
 		}
@@ -388,26 +400,28 @@ function onMessage(message){
 
 	if(m.ping){
 		clearTimeout(expectPingTimeout);
-		latency1 = (new Date()).getTime()-pingResponseTime;
-		latency2 = pingResponseTime-pingStartTime;
-		pinging = false;
-		showPreview(true);
-	}
-
-	if(latency1 != -1){
-		avgLatency1 = (avgLatency1*numLatencies+latency1)/(numLatencies+1);
-		avgLatency2 = (avgLatency2*numLatencies+latency2)/(numLatencies+1);
-		numLatencies++;
-		if(notifyPing && m.ping){
-			note = "Ping successful.\nAJAX response latency: " + latency1 + " ms. (Avg "+Math.round(avgLatency1)+")."+
-				"\nChannel response latency: " + latency2 + " ms. (Avg "+Math.round(avgLatency2)+").";
-			displayNote(note);
-		}
+		pingChannelTime = (new Date()).getTime();
+		if(pingAjaxTime != -1) reportPing();
 	}
 }
 
-var avgLatency1 = 0;
-var avgLatency2 = 0;
+function reportPing(){
+	var channelLatency = pingChannelTime - pingStartTime;
+	var ajaxLatency = pingAjaxTime - pingStartTime;
+	avgChannelLatency = (avgChannelLatency*numLatencies+channelLatency)/(numLatencies+1);
+	avgAjaxLatency = (avgAjaxLatency*numLatencies+ajaxLatency)/(numLatencies+1);
+	numLatencies++;
+	if(notifyPing){
+		var note = "Ping successful.\nChannel response latency: " + channelLatency + " ms. (Avg "+Math.round(avgChannelLatency)+")."+
+			"\nAJAX response latency: " + ajaxLatency + " ms. (Avg "+Math.round(avgAjaxLatency)+").";
+		displayNote(note);
+	}
+	pinging = false;
+	showPreview(true);
+}
+
+var avgChannelLatency = 0
+var avgAjaxLatency = 0
 var numLatencies = 0;
 
 function logout(){
@@ -453,7 +467,7 @@ newCommand("preview",function(){return (mathpreview?"disable":"enable")+" the pr
 
 newCommand("math",function(){return (dopreview?"disable":"enable")+" live previewing of math";},function(){mathpreview = !mathpreview;});
 
-newCommand("sync",function(){return syncing?"!Syncing in progress, command disabled":"synchronize the discussion in case you failed to recieve some messages";},function(){sync();});
+newCommand("sync",function(){return syncing?"!Syncing in progress, command disabled":"synchronize the discussion in case you failed to receive some messages";},function(){sync();});
 
 newCommand("ping",function(){return pinging?"!Pinging in progress, command disabled":"check whether the channel is open";},function(){ping(true);});
 
@@ -467,9 +481,9 @@ var showingLog = false;
 function sendPost(){
 	text = document.getElementById("composefield").value.replace(/\r/g,"");
 
-	if(text.substring(0,1)=='/'){
+	if(text.substring(0,1)=='/'&&text.substring(0,2)!='//'){
 		//deal with commands
-		var tag = text.substring(1).split()[0];
+		var tag = text.substring(1).split(/\s/)[0];
 		for(var command in commands){
 			if (commands[command].tag == tag){
 				commands[command].action();
@@ -481,42 +495,32 @@ function sendPost(){
 
 	if(disableSend) return;
 	
-	var thisIndex = expectedPosts.length;
-	expectedPosts.push({index:thisIndex,startTime:(new Date()).getTime(),text:document.getElementById("composefield").value});
+	var thisPost = {startTime:(new Date()).getTime(),text:document.getElementById("composefield").value}
+	expectedPosts.push(thisPost);
 
 	//if(text == "") return;
 	var callback = function(response){
-		//i should actually queue here
-		expectedPosts[thisIndex].id = response;
-		expectedPosts[thisIndex].timeout = setTimeout("onClose();",channelWaitLeniency);
-		expectedPosts[thisIndex].responseTime = (new Date()).getTime();
 		allowSend(true,"post");
+
+		//maybe post has been received already
+		var id = Number(response);
+		checkIndex = receivedPostIDs.indexOf(id);
+		if(checkIndex>-1){
+			delete thisPost;
+			return;
+		}
+
+		thisPost.id = id;
+		thisPost.timeout = setTimeout("channelFail();",channelWaitLeniency);
 	};
 
 	var abort = function(){
-		var note = 'Your post may have failed to send:\n\n`'+expectedPosts[thisIndex].text.replace(/`/g,"``")+"`";
+		var note = 'Your post may have failed to send:\n\n`'+thisPost.text.replace(/`/g,"``")+"`";
 		displayNote(note);
 		failNotify.push(noteLog.length - 1);
-		onClose();
 	};
 
-	if(0&&metahead == "call"){
-		var html = getHTMLfromSavvyCode(text, false, username, true).html;
-		var rec = meta.replace(/^.*?\:|.*/,"");
-		if(rec == "") rec = "all";
-	}
-	
 	sendMessage('/post', {p:text}, callback, abort)
-	if(0&&metahead == "call"){
-		//send html version for email
-		abort = function(){
-			var note = 'Call email failed to send for some reason.';
-			displayNote(note);
-			failNotify.push(noteLog.length - 1);
-			onClose();
-		};
-		sendMessage('/call', {h:html,r:rec});
-	}
 
 	document.getElementById("preview").innerHTML = "";
 	//showPreview(true);
@@ -524,7 +528,7 @@ function sendPost(){
 	backupText = document.getElementById("composefield").value;
 	document.getElementById("composefield").value = "";
 	allowSend(false,"post");
-	//recievePost({content:document.getElementById("composefield").value,author:username,date:"1/3/11, 13:30 EST"});
+	//receivePost({content:document.getElementById("composefield").value,author:username,date:"1/3/11, 13:30 EST"});
 }
 
 var expectedPosts = [];
@@ -537,7 +541,7 @@ function retrieveArchive(numPosts){
 	var callback = function(response){
 		var m = $.parseJSON(response);
 		document.getElementById("viewarchivetag").innerHTML='<a href="" onclick="retrieveArchive();return false;">^ view older ^</a>'
-		recieveArchive(m.posts);
+		receiveArchive(m.posts);
 		retrieving = false;
 		showPreview(true);
 		endquerycursor = m.cursor;
@@ -548,10 +552,9 @@ function retrieveArchive(numPosts){
 	};
 
 	var abort = function(){
-		document.getElementById("viewarchivetag").innerHTML='<a href="" onclick="retrieveArchive();return false;">^ Error! Try again? ^</a>'
+		document.getElementById("viewarchivetag").innerHTML='<a href="" onclick="retrieveArchive();return false;">^ Retrieval failed! Try again? ^</a>'
 		retrieving = false;
 		showPreview(true);
-		onClose();
 	};
 
 	retrieving = true;
@@ -563,13 +566,13 @@ function retrieveArchive(numPosts){
 
 var syncInterrupt = false;
 var syncing = false
-//sync messages that may have not been recieved in COMET
+//sync messages that may have not been received in COMET
 function sync(){
 	if(syncing) return;
 	var callback = function(response){
 		var m = $.parseJSON(response);
 		startquerycursor = m.cursor;
-		recieveSync(m.posts);
+		receiveSync(m.posts);
 		syncing = false;
 		for(var note in failNotify){
 			displayNote(noteLog[failNotify[note]],true);
@@ -580,14 +583,15 @@ function sync(){
 			sync();
 		}
 	};
-	sendMessage('/sync', {c:startquerycursor}, callback);
+	sendMessage('/sync', {c:startquerycursor}, callback,function(){syncing=false;});
 	syncing = true;
 	showPreview(true)
 	syncInterrupt = false;
 }
 
 var expectPingTimeout = null;
-var pingResponseTime;
+var pingAjaxTime=-1;
+var pingChannelTime=-1;
 var pinging = false;
 var notifyPing = false;
 var pingStartTime;
@@ -597,10 +601,11 @@ function ping(notify){
 	pinging = true;
 	showPreview(true);
 
-	//send ping, recieve confirmation. Time it
+	//send ping, receive confirmation. Time it
 	var callback = function(response){
-		expectPingTimeout = setTimeout("onClose();",channelWaitLeniency);
-		pingResponseTime = (new Date()).getTime();
+		pingAjaxTime = (new Date()).getTime();
+		if(pingChannelTime != -1) reportPing();
+		else expectPingTimeout = setTimeout("pinging=false;pingAjaxTime=-1;channelFail();",channelWaitLeniency);
 	};
 	var abort = function(response){
 		pinging = false;
@@ -609,19 +614,20 @@ function ping(notify){
 			displayNote(note);
 			failNotify.push(note);
 		}
-		onClose();
 	};
 	sendMessage('/ping', {t:tokenid}, callback, abort);
 	pingStartTime = (new Date()).getTime();
+	pingAjaxTime = -1;
+	pingChannelTime = -1;
 }
 
 //process the archive
-function recieveArchive(posts){
+function receiveArchive(posts){
 	//insert new posts
 	//var postlist=document.getElementById("archivelist");
 	//var interdiv=postlist.firstChild;
 	for(var i=0;i<posts.length;i++){
-		recievePost(posts[i],true);
+		receivePost(posts[i],true);
 	}
 	//if (interdiv.previousSibling.childNodes[1].innerHTML==interdiv.childNodes[1].innerHTML){
 		//interdiv.childNodes[1].style.display="None";
@@ -629,7 +635,7 @@ function recieveArchive(posts){
 }
 
 //process the sync
-function recieveSync(posts){
+function receiveSync(posts){
 	//first, remove all unsynced posts
 	var postlist = document.getElementById("archivelist");
 	for (var postidx = postlist.childNodes.length - 1;postidx >= 0;postidx --){
@@ -641,7 +647,7 @@ function recieveSync(posts){
 	//insert new posts
 	//var interdiv = postlist.firstChild
 	for(var i=posts.length-1;i>=0;i--){
-		recievePost(posts[i]);
+		receivePost(posts[i]);
 	}
 	//if (interdiv.previousSibling.childNodes[1].innerHTML==interdiv.childNodes[1].innerHTML){
 		//interdiv.childNodes[1].style.display="None";
@@ -811,7 +817,7 @@ function MJQT(id){
 }
 
 //process post and add to list
-function recievePost(post,prepend,notification){
+function receivePost(post,prepend,notification){
 	var cachedmathpreview = mathpreview;
 	var messageHtml = getHTMLfromSavvyCode(post.content,true);
 	var postdate;
@@ -951,9 +957,9 @@ function showPreview(ignoreCache){
 
 	var messageHTML = ""
 
-	if(composetext.substring(0,1)=='/'){
+	if(composetext.substring(0,1)=='/'&&composetext.substring(0,2)!='//'){
 		//deal with commands
-		var tag = composetext.substring(1).split()[0];
+		var tag = composetext.substring(1).split(/\s/)[0];
 		var text = "";
 		for(var command in commands){
 			if (commands[command].tag == tag){
@@ -1504,7 +1510,7 @@ function onLoadBody(){
 		for(var j=3;j<ip[i].childNodes.length;j++){
 			recipients.push(ip[i].childNodes[j].innerHTML);
 		}
-		recievePost({author:ip[i].childNodes[0].innerHTML, content:unescapedContent, date:ip[i].childNodes[2].innerHTML, recipients:recipients});
+		receivePost({author:ip[i].childNodes[0].innerHTML, content:unescapedContent, date:ip[i].childNodes[2].innerHTML, recipients:recipients});
 	}
 	
 	setIcon("favicon.ico");//maybe this should be *before* page load...

@@ -25,7 +25,7 @@ import re
 import traceback
 
 MAXPOSTS = 30 #max number of posts initialized
-#EXTRAPOSTS = 30 #number of posts recieved when "view older" is checked.
+#EXTRAPOSTS = 30 #number of posts received when "view older" is checked.
 
 #http://stackoverflow.com/questions/2350454/simplest-way-to-store-a-value-in-google-app-engine-python
 class Global(db.Model):
@@ -48,7 +48,6 @@ class Global(db.Model):
 class Post(db.Model):
 	#each post stored in the DB is of this class
 	author = db.StringProperty()
-	postid = db.StringProperty()
 	content = db.TextProperty()#if i use string, there's a 500 character limit
 	recipients = db.StringListProperty()#for call
 	date = db.DateTimeProperty(auto_now_add=True)
@@ -501,6 +500,10 @@ class ClosedPage(webapp.RequestHandler):
 			#we didn't error out, this user has seen all messages
 			chatuser.lastonline = datetime.utcnow()
 		chatuser.put()
+
+		#gotta do this stuff somewhere
+		resolveStragglers()
+		checkDump()
 		
 class OptionsPage(webapp.RequestHandler):
 	#for when someone changes some setting
@@ -750,8 +753,8 @@ application = webapp.WSGIApplication([
 									('/closed', ClosedPage)])
 
 def main():
-	resolveStragglers()
-	checkDump()
+	#resolveStragglers()
+	#checkDump()
 	run_wsgi_app(application)
 
 if __name__ == "__main__":
