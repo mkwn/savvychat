@@ -48,6 +48,7 @@ class Global(db.Model):
 class Post(db.Model):
 	#each post stored in the DB is of this class
 	author = db.StringProperty()
+	postid = db.StringProperty()
 	content = db.TextProperty()#if i use string, there's a 500 character limit
 	recipients = db.StringListProperty()#for call
 	date = db.DateTimeProperty(auto_now_add=True)
@@ -242,9 +243,9 @@ def makePostObject(post):
 		author = post.author
 	else:
 		author = author.name
-	return {"content":post.content,"author":author,"date":str(time.mktime(post.date.timetuple())),"recipients":post.recipients}
+	return {"content":post.content,"author":author,"date":str(time.mktime(post.date.timetuple())),"recipients":post.recipients,"id":post.key().id()}
 
-def doPost(content, author=None):
+def doPost(content, author=None, dontSave=False):
 	if not author:
 		user = users.get_current_user()
 		if not user:
@@ -256,46 +257,13 @@ def doPost(content, author=None):
 	post = Post()
 	post.author = author or user.user_id()
 	post.content = content
-	
-	post.recipients = []#for call
-	contenttext = post.content
-	
-	#check for meta
-	metahead = ""
-	m = re.match(r"\|+([^\|]+?)(\|+|$)([\s\S]*)", post.content)
-	if m:
-		#we have meta
-		meta,contenttext = m.group(1,3)
-		meta = removeWhitespace(meta.lower())
-		metaparts = meta.split(":")
-		metahead = metaparts[0]
-		#check if topic was changed
-		if metahead == "topic":
-			Global.set('topic',post.content.replace("\n"," "))
-		
-		#check if users were called
-		if metahead == "call":
-			if len(metaparts) == 1:
-				#no arguments, call all
-				post.recipients = ["all"]
-			else:
-				callstring = ',' + ":".join(metaparts[1:]).lower() + ','
-				#replace aliases
-				aliasData = open("aliases.txt")
-				aliasList = aliasData.readlines()
-				aliasData.close()
-				for aliasRow in aliasList:
-					#replace aliases
-					alias, result = tuple(aliasRow.rstrip().split(" "))
-					callstring = callstring.replace(","+alias+",",","+result+",")
-				post.recipients = list(Set(callstring.split(",")[1:-1]))
-				if "all" in post.recipients:
-					post.recipients = ["all"]
-			
-	if metahead != "notify":
-		post.put()
-	else:
+
+	post.recipients = []
+
+	if dontSave:
 		post.date = datetime.now()
+	else:
+		post.put()
 	broadcast(post)
 	if not author:
 		authoruser.lastonline = datetime.utcnow()
@@ -734,7 +702,7 @@ class UploadPage(webapp.RequestHandler):
 		try:
 			file.put()
 		except:
-			doPost("|notify|File upload failed","SavvyChat")
+			doPost("File upload failed","SavvyChat",dontSend=True)
 			return
 		path = "download/"+str(file.key().id()) + "/" + filename
 		fullpath = "http://" + self.request.host + "/" + path

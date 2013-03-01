@@ -58,6 +58,9 @@ var disableSend = false
 var windowFocus = true;
 var mute = false;
 
+var channelWaitLeniency = 10*1000;
+var connectionCheckInterval = 5*60*1000;
+
 //http://codingrecipes.com/onmouseout-fix-on-nested-elements-javascript
 function is_child_of(parent, child){
 	if(child != null){
@@ -258,9 +261,9 @@ function onClose(){
 var noteLog = [];
 function displayNote(post, skipLog){
 	if(post.constructor == String)
-		post = {content:"|notify|"+post, author:"SavvyChat", date:new Date(), recipients:[]};
+		post = {content:post, author:"SavvyChat", date:new Date(), recipients:[]};
 	if(!skipLog) noteLog.push(post);
-	recievePost(post);
+	recievePost(post,false,true);
 }
 
 var sounds = {};
@@ -342,11 +345,14 @@ function onMessage(message){
 
 	//every 5 minutes we should try a ping
 	clearTimeout(checkConnectionTimeout);
-	checkConnectionTimeout = setTimeout("ping(false);",5*60*1000);
+	checkConnectionTimeout = setTimeout("ping(false);",connectionCheckInterval);
 	
 	var m = $.parseJSON(message.data);
+
+	var latency1 = -1;
+	var latency2 = -1;
+
 	if(m.content){
-		clearTimeout(expectPostTimeout);
 		if(syncing){
 			syncInterrupt = true;
 			return;
@@ -367,19 +373,42 @@ function onMessage(message){
 			}
 			alerted = true;
 		}
-		return;
+
+		for(var post in expectedPosts){
+			var postObject = expectedPosts[post]
+			if(postObject.id == m.id) {
+				clearTimeout(postObject.timeout);
+				latency1 = (new Date()).getTime()-postObject.responseTime;
+				latency2 = postObject.responseTime-postObject.startTime;
+				expectedPosts.splice(postObject.index,1);
+				break;
+			}
+		}
 	}
+
 	if(m.ping){
 		clearTimeout(expectPingTimeout);
-		if(notifyPing){
-			d = new Date();
-			note = "Successful ping. Latency was " + (d.getTime()-pingStart) + "ms.";
-			displayNote(note);
-		}
+		latency1 = (new Date()).getTime()-pingResponseTime;
+		latency2 = pingResponseTime-pingStartTime;
 		pinging = false;
 		showPreview(true);
 	}
+
+	if(latency1 != -1){
+		avgLatency1 = (avgLatency1*numLatencies+latency1)/(numLatencies+1);
+		avgLatency2 = (avgLatency2*numLatencies+latency2)/(numLatencies+1);
+		numLatencies++;
+		if(notifyPing && m.ping){
+			note = "Ping successful.\nAJAX response latency: " + latency1 + " ms. (Avg "+Math.round(avgLatency1)+")."+
+				"\nChannel response latency: " + latency2 + " ms. (Avg "+Math.round(avgLatency2)+").";
+			displayNote(note);
+		}
+	}
 }
+
+var avgLatency1 = 0;
+var avgLatency2 = 0;
+var numLatencies = 0;
 
 function logout(){
 	closeMessage();
@@ -428,7 +457,7 @@ newCommand("sync",function(){return syncing?"!Syncing in progress, command disab
 
 newCommand("ping",function(){return pinging?"!Pinging in progress, command disabled":"check whether the channel is open";},function(){ping(true);});
 
-newCommand("refresh",function(){return refreshing?"!Refreshing in progress, command disabled":"request anew channel token to refresh the connection";},function(){refreshToken();});
+newCommand("refresh",function(){return refreshing?"!Refreshing in progress, command disabled":"request a new channel token to refresh the connection";},function(){refreshToken();});
 
 newCommand("upload",function(){return "open upload dialog";},function(){showUpload();});
 
@@ -437,46 +466,48 @@ var showingLog = false;
 //send a new post to the server
 function sendPost(){
 	text = document.getElementById("composefield").value.replace(/\r/g,"");
-	//get meta in case it's an option, in that case we want to set the option and not send
-	var meta = "";
-	var metahead;
-	if(/^\|+([^\|]+?)(\|+|$)([\s\S]*)/.test(text)){
-		meta = RegExp.$1;
-		//worktext = RegExp.$3;
-		meta = meta.toLowerCase().replace(/\s/g,"");
-		metahead = meta.split(":")[0]
-		
-		for(command in commands){
-			if (commands[command].tag == metahead){
+
+	if(text.substring(0,1)=='/'){
+		//deal with commands
+		var tag = text.substring(1).split()[0];
+		for(var command in commands){
+			if (commands[command].tag == tag){
 				commands[command].action();
 				return showPreview(true);
 			}
 		}
+		return;
 	}
-	
+
 	if(disableSend) return;
 	
+	var thisIndex = expectedPosts.length;
+	expectedPosts.push({index:thisIndex,startTime:(new Date()).getTime(),text:document.getElementById("composefield").value});
+
 	//if(text == "") return;
 	var callback = function(response){
 		//i should actually queue here
+		expectedPosts[thisIndex].id = response;
+		expectedPosts[thisIndex].timeout = setTimeout("onClose();",channelWaitLeniency);
+		expectedPosts[thisIndex].responseTime = (new Date()).getTime();
 		allowSend(true,"post");
 	};
 
 	var abort = function(){
-		var note = 'Your post may have failed to send:\n\n`'+backupText.replace(/`/g,"``")+"`";
+		var note = 'Your post may have failed to send:\n\n`'+expectedPosts[thisIndex].text.replace(/`/g,"``")+"`";
 		displayNote(note);
 		failNotify.push(noteLog.length - 1);
 		onClose();
 	};
 
-	if(metahead == "call"){
+	if(0&&metahead == "call"){
 		var html = getHTMLfromSavvyCode(text, false, username, true).html;
 		var rec = meta.replace(/^.*?\:|.*/,"");
 		if(rec == "") rec = "all";
 	}
 	
 	sendMessage('/post', {p:text}, callback, abort)
-	if(metahead == "call"){
+	if(0&&metahead == "call"){
 		//send html version for email
 		abort = function(){
 			var note = 'Call email failed to send for some reason.';
@@ -486,8 +517,7 @@ function sendPost(){
 		};
 		sendMessage('/call', {h:html,r:rec});
 	}
-	clearTimeout(expectPostTimeout);
-	expectPostTimeout = setTimeout("onClose();",20*1000);
+
 	document.getElementById("preview").innerHTML = "";
 	//showPreview(true);
 	document.getElementById("authorpreview").innerHTML = username + ":";
@@ -496,6 +526,8 @@ function sendPost(){
 	allowSend(false,"post");
 	//recievePost({content:document.getElementById("composefield").value,author:username,date:"1/3/11, 13:30 EST"});
 }
+
+var expectedPosts = [];
 
 var retrieving = false;
 //call the server for some archive
@@ -539,8 +571,8 @@ function sync(){
 		startquerycursor = m.cursor;
 		recieveSync(m.posts);
 		syncing = false;
-		for(note in failNotify){
-			displayNote(noteLog[failNotify[note]],true)
+		for(var note in failNotify){
+			displayNote(noteLog[failNotify[note]],true);
 		}
 		failNotify = [];
 		showPreview(true);
@@ -555,16 +587,21 @@ function sync(){
 }
 
 var expectPingTimeout = null;
+var pingResponseTime;
 var pinging = false;
 var notifyPing = false;
-var pingStart;
+var pingStartTime;
 function ping(notify){
 	notifyPing = notify;
 	if(pinging) return;
 	pinging = true;
 	showPreview(true);
+
 	//send ping, recieve confirmation. Time it
-	var callback = function(response){};
+	var callback = function(response){
+		expectPingTimeout = setTimeout("onClose();",channelWaitLeniency);
+		pingResponseTime = (new Date()).getTime();
+	};
 	var abort = function(response){
 		pinging = false;
 		if(notifyPing){
@@ -575,13 +612,7 @@ function ping(notify){
 		onClose();
 	};
 	sendMessage('/ping', {t:tokenid}, callback, abort);
-	d = new Date();
-	pingStart = d.getTime();
-	clearTimeout(expectPingTimeout);
-	expectPingTimeout = setTimeout("pinging=false;onClose();",20*1000);
-	if(notify){
-		//notify
-	}
+	pingStartTime = (new Date()).getTime();
 }
 
 //process the archive
@@ -590,7 +621,7 @@ function recieveArchive(posts){
 	//var postlist=document.getElementById("archivelist");
 	//var interdiv=postlist.firstChild;
 	for(var i=0;i<posts.length;i++){
-		recievePost(posts[i],true,true);
+		recievePost(posts[i],true);
 	}
 	//if (interdiv.previousSibling.childNodes[1].innerHTML==interdiv.childNodes[1].innerHTML){
 		//interdiv.childNodes[1].style.display="None";
@@ -780,9 +811,9 @@ function MJQT(id){
 }
 
 //process post and add to list
-function recievePost(post,ignoretopics,prepend){
+function recievePost(post,prepend,notification){
 	var cachedmathpreview = mathpreview;
-	var parsedObj =	getHTMLfromSavvyCode(post.content, true, post.author);
+	var messageHtml = getHTMLfromSavvyCode(post.content,true);
 	var postdate;
 	if(post.date.constructor == Date){
 		postdate = post.date;
@@ -792,26 +823,7 @@ function recievePost(post,ignoretopics,prepend){
 		postdate = new Date(parseFloat(post.date)*1000);
 	}
 	var parsedDate = formatDate(postdate);
-	var classtext = "";
-	var metahead = parsedObj.meta.split(":")[0];
-
-	if(metahead == 'topic'){
-		classtext = ' topicpost';
-		if(!ignoretopics){
-			document.getElementById("topic").innerHTML = parsedObj.html;
-			MJQT("topic");
-		}
-	}else if(metahead == "notify"){
-		//undocumented meta to send a notification
-		scrollLocked = true;
-		scrollDown();
-		classtext = ' notifypost';
-		if(post.author != "SavvyChat" && !showingLog) noteLog.push(post);
-	}else{
-		if(gotCalled(post)){
-			classtext = ' callpost';
-		}
-	}
+	var classtext = notification?" notifypost":"";
 	var quoteHTML = '<a>'+parsedDate+'</a>';
 	var titleHTML = "";
 	//if(gadget) titleHTML = ' title="'+parsedDate+'"';
@@ -819,7 +831,7 @@ function recievePost(post,ignoretopics,prepend){
 		//var escapedPost = post.content.replace(/\\/g,"\\\\").replace(/\n/g,"\\n").replace(/"/g,"\\&quot;");
 		//quoteHTML = '<a href="" onclick="autoquote(&quot;'+escapedPost+'&quot;,&quot;'+post.author+'&quot;,&quot;'+parsedDate+'&quot;);return false;" title="quote this post">'+parsedDate+'</a>';
 	//}
-	var divHTML='<div class="datelabel">'+quoteHTML+' </div><span class="author">'+parsedObj.authortext+'</span><span class="postcontent">' + parsedObj.html + '</span>';
+	var divHTML='<div class="datelabel">'+quoteHTML+' </div><span class="author">'+post.author+': </span><span class="postcontent">' + messageHtml + '</span>';
 	var newdiv = document.createElement('div');
 	newdiv.innerHTML = divHTML;
 	if(gadget) newdiv.title = parsedDate
@@ -840,17 +852,15 @@ function recievePost(post,ignoretopics,prepend){
 		//append
 		//hide author label for repeated posts by the same author
 		if(postlist.lastChild){
-			if(parsedObj.html != ""){
-				if(metahead !== "notify"){
-					if(postlist.lastChild.childNodes[1].innerHTML == parsedObj.authortext){
-						newdiv.childNodes[1].style.display = "None";
-						addClass(newdiv,"joinedattop");
-						addClass(postlist.lastChild,"joinedatbottom");
-						//newdiv.style.marginTop = "0";
-						//newdiv.style.paddingTop = "0";
-						//postlist.lastChild.style.paddingBottom = "0";
-						//postlist.lastChild.innerHTML += "<hr SLASH>";
-					}
+			if(messageHtml != ""){
+				if(postlist.lastChild.childNodes[1].innerHTML == post.author+": "){
+					newdiv.childNodes[1].style.display = "None";
+					addClass(newdiv,"joinedattop");
+					addClass(postlist.lastChild,"joinedatbottom");
+					//newdiv.style.marginTop = "0";
+					//newdiv.style.paddingTop = "0";
+					//postlist.lastChild.style.paddingBottom = "0";
+					//postlist.lastChild.innerHTML += "<hr SLASH>";
 				}
 			}
 		}
@@ -859,17 +869,15 @@ function recievePost(post,ignoretopics,prepend){
 		//prepend
 		//hide author label for repeated posts by the same author
 		if(postlist.firstChild){
-			if(parsedObj.html != ""){
-				if(metahead !== "notify"){
-					if(postlist.firstChild.childNodes[1].innerHTML == parsedObj.authortext){
-						postlist.firstChild.childNodes[1].style.display = "None";
-						addClass(newdiv,"joinedatbottom");
-						addClass(postlist.firstChild,"joinedattop");
-						//postlist.firstChild.style.marginTop = "0";
-						//postlist.firstChild.style.paddingTop = "0";
-						//newdiv.style.paddingBottom = "0";
-						//newdiv.innerHTML += "<hr SLASH>";
-					}
+			if(messageHtml != ""){
+				if(postlist.firstChild.childNodes[1].innerHTML == post.author+": "){
+					postlist.firstChild.childNodes[1].style.display = "None";
+					addClass(newdiv,"joinedatbottom");
+					addClass(postlist.firstChild,"joinedattop");
+					//postlist.firstChild.style.marginTop = "0";
+					//postlist.firstChild.style.paddingTop = "0";
+					//newdiv.style.paddingBottom = "0";
+					//newdiv.innerHTML += "<hr SLASH>";
 				}
 			}
 		}
@@ -941,10 +949,40 @@ function showPreview(ignoreCache){
 		}
 	}
 
-	var parsedObj = getHTMLfromSavvyCode(composetext, mathpreview, username);
-	
-	document.getElementById("preview").innerHTML = parsedObj.html;
-	document.getElementById("authorpreview").innerHTML = parsedObj.authortext;
+	var messageHTML = ""
+
+	if(composetext.substring(0,1)=='/'){
+		//deal with commands
+		var tag = composetext.substring(1).split()[0];
+		var text = "";
+		for(var command in commands){
+			if (commands[command].tag == tag){
+				text = commands[command].preview();
+				if(text.substring(0,1) == '!')
+					text = text.substring(1)
+				else
+					text = "Special command to "+text+" (will not send)";
+			}
+		}
+
+		if(text == ""){
+			if(tag == ""){
+				text = "prepended <span class=\"code\">/</span> is for commands. See <a href=\"javascript:openHelp();\">help</a>."
+			}else{
+				text = "unknown command <span class=\"code\">"+tag+"</span>."
+			}
+			allowSend(false,"unknowntag");
+		}else{
+			allowSend(true,"unknowntag");
+		}
+		messageHTML = "<strong>"+text+"</strong>";
+	} else {
+		//proper message
+		messageHTML = getHTMLfromSavvyCode(composetext, mathpreview);
+	}
+
+	document.getElementById("preview").innerHTML = messageHTML;
+	document.getElementById("authorpreview").innerHTML = username+": ";
 
 	//restore mode of spoilers
 	var quotes = document.getElementById("preview").getElementsByTagName("blockquote")
@@ -964,66 +1002,15 @@ function showPreview(ignoreCache){
 }
 
 //turn my formatting syntax into HTML for display
-function getHTMLfromSavvyCode(savvyCode, domath, author, compress){
+function getHTMLfromSavvyCode(savvyCode, domath){
 	if(disableMath){
 		domath = false;
 	}
-	
-	if(compress == undefined) compress = false;
-	
 	//escape stuff
-	var worktext = savvyCode.replace(/\r/g,"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/\>/g,"&gt;").replace(/"/g,"&quot;").replace(/\\\(/g,"\\<a></a>(");
+	var worktext = savvyCode.replace(/\r\n/g,"\n").replace(/\r/g,"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/\>/g,"&gt;").replace(/"/g,"&quot;").replace(/\\\(/g,"\\<a></a>(");
 	
-	//first check for a meta tag at the beginning of the text
-	var authortext=author + ": ";
-	var meta = "";
-	var metahead = "";
-	var multiline = true;
-	if(/^\|+([^\|]+?)(\|+|$)([\s\S]*)/.test(worktext)){
-		meta = RegExp.$1;
-		worktext = RegExp.$3;
-		meta = meta.toLowerCase().replace(/\s/g,"");
-		var parts = meta.split(":");
-		metahead = parts[0]
-		var str;//helper string for some options
+	var multiline = true; //no longer necessary
 
-		for(command in commands){
-			if (commands[command].tag == metahead){
-				var text = commands[command].preview();
-				if(text.substring(0,1) != '!')
-					text = "Special command to "+text+" (will not send)";
-				return {meta:commands[command].tag,html:"<strong>"+text+"</strong>", authortext:authortext};
-			}
-		}
-
-		switch (metahead){
-		case "topic":
-			//topics don't have any multiline stuff
-			worktext = worktext.replace(/\n/g," ");
-			multiline = false;
-			authortext = author + " changed topic: ";
-			break
-		case "img":
-			var url = worktext.replace(/\n/g,"")
-			var onload = "setTimeout(&quot;scrollDown();ww=0;fitWindow();&quot;,1);"
-			return {meta:'img',html:'<br /'+'><a target="_blank" href="' + url + '"><img onerror="' + onload + '" onload="' + onload + '" src="' + url + '" /'+'></a>', authortext:authortext};
-			break;
-		case "me":
-			multiline = false;
-			worktext = worktext.replace(/\n/g," ");
-			break;
-		case "call":
-			var recipientText;
-			if(parts.length == 1){
-				recipientText = "all";
-			}else{
-				parts.shift();
-				recipientText = parts.join(":").replace(/,/g,", ");
-			}
-			authortext = author + " calls "+ recipientText + ": ";
-			break;
-		}
-	}
 	if(worktext == "") worktext = " ";
 	//find something formatted like a link
 	worktext = "\r" + worktext + "\r";
@@ -1041,11 +1028,6 @@ function getHTMLfromSavvyCode(savvyCode, domath, author, compress){
 	var btags = '<strong>$1</strong>';
 	var itags = '<em>$1</em>';
 	var stags = '<span class="strikethrough">$1</span>';
-	if(compress){
-		btags = '<b$1b>';
-		itags = '<i$1i>';
-		stags = '<s$1s>';
-	}
 	
 	//output = output.replace(/\*\*\*\*/g,"");
 	//output = output.replace(/\/\/\/\//g,"");
@@ -1059,11 +1041,11 @@ function getHTMLfromSavvyCode(savvyCode, domath, author, compress){
 	if(multiline){
 		//add quotes
 		output = "\r" + output + "\r";
-		output = output.replace(/([\r\n]&gt;.*?)+[\r\n]/g,function(savvyCode){return addQuotes(savvyCode,compress);});
+		output = output.replace(/([\r\n]&gt;.*?)+[\r\n]/g,function(savvyCode){return addQuotes(savvyCode);});
 		
 		//add dot points
 		output = "\r" + output + "\r";
-		output = output.replace(/([\r\n]- .*?)+[\r\n]/g,function(savvyCode){return addDotPoints(savvyCode,compress);});
+		output = output.replace(/([\r\n]- .*?)+[\r\n]/g,function(savvyCode){return addDotPoints(savvyCode);});
 	}
 	
 	var citags = ['<span class="code tex2jax_ignore">','</span>'];
@@ -1074,13 +1056,6 @@ function getHTMLfromSavvyCode(savvyCode, domath, author, compress){
 	if(domath){
 		mitags = ['\\(','\\)'];
 		mbtags = ['$$',' $$'];
-	}
-	if(compress){
-		citags = ['<c','c>'];
-		cbtags = ['<x','x>'];
-		atags = ['<a[[<>','a>'];
-		mitags = ['<m','m>'];
-		mbtags = ['<z','z>'];
 	}
 	
 	//put back code
@@ -1103,32 +1078,15 @@ function getHTMLfromSavvyCode(savvyCode, domath, author, compress){
 
 	output = output.replace(/\r/g,'');
 	//order escaped backticks
-	if(compress){
-		while(output.indexOf('`<ii><c') >= 0){
-			output = output.replace(/`<ii><c/g,'<c`');
-		}
-	}else{
-		while(output.indexOf('`<em></em><span class="code') >= 0){
-			output = output.replace(/`<em><\/em><span class="code(.+?)>/g,'<span class="code$1>`');
-		}
+	while(output.indexOf('`<em></em><span class="code') >= 0){
+		output = output.replace(/`<em><\/em><span class="code(.+?)>/g,'<span class="code$1>`');
 	}
-
-	//add newlines
-	if(compress){
-		output = output.replace(/\n/g,'<r');
-	}else{
-		output = output.replace(/\n/g,'<br /'+'>');
-	}
-	if(metahead == "me"){
-		if(output.substr(0,1) != " ") output = " " + output;
-		return {meta:meta,html:"",authortext:author + output};
-	}
-	return {meta:meta,html:output,authortext:authortext};
+	return output;
 }
 
 //recursive helper function that uses an undocumented feature of replace() to parse nested ">" quote tags
-function addQuotes(savvyCode,compress){
-	var content = savvyCode.replace(/([\n\r])&gt;/g,"$1").replace(/^\n|\n$/g,'').replace(/([\r\n]&gt;.*?)+[\r\n]/g,function(savvyCode){return addQuotes(savvyCode,compress);})+"\r";
+function addQuotes(savvyCode){
+	var content = savvyCode.replace(/([\n\r])&gt;/g,"$1").replace(/^\n|\n$/g,'').replace(/([\r\n]&gt;.*?)+[\r\n]/g,function(savvyCode){return addQuotes(savvyCode);})+"\r";
 	if(content.replace(/\r/g,"") == ""){
 		content = "<br /"+">";
 	}
@@ -1136,21 +1094,13 @@ function addQuotes(savvyCode,compress){
 	if(/^[\r\n]*&lt; *.*?[\n\r]/.test(content)){
 		content = content.replace(/^[\r\n]*&lt; *(.*?)[\n\r]/,"\r")
 		//this is a spoiler
-		if(compress){
-			return '\r<t' + RegExp.$1 + 't><p' + content + 'p>\r';
-		}
+
 		return '\r<blockquote class="spoiler"><a onclick="if(this.nextSibling.style.display==&quot;none&quot;){this.nextSibling.style.display=&quot;block&quot;;scrollDown();}else{this.nextSibling.style.display=&quot;none&quot;}return false;" href="">Show/Hide <span class="collapsetitle">' + RegExp.$1 + '</span></a><div style="display:none;">' + content + '</div></blockquote>\r';
-	}
-	if(compress){
-		return '\r<q\r' + content + '\rq>\r';
 	}
 	return '\r<blockquote>\r' + content + '\r</blockquote>\r';
 }
 
-function addDotPoints(savvyCode,compress){
-	if(compress){
-		return "<u" + savvyCode.replace(/[\r\n]/g,"\r\r").replace(/\r- (.*?)\r/g,"<l$1l>") + "u>"
-	}
+function addDotPoints(savvyCode){
 	return "<ul>" + savvyCode.replace(/[\r\n]/g,"\r\r").replace(/\r- (.*?)\r/g,"<li>$1</li>") + "</ul>"
 }
 
@@ -1524,8 +1474,8 @@ function onLoadBody(){
 	}
 	
 	//parse topic
-	var parsedObj = getHTMLfromSavvyCode(document.getElementById("topic").innerHTML, true, "");
-	document.getElementById("topic").innerHTML = parsedObj.html;
+	var topicHTML = getHTMLfromSavvyCode(document.getElementById("topic").innerHTML,true);
+	document.getElementById("topic").innerHTML = topicHTML;
 	MJQT("topic");
 	
 	//keyboard shortcuts
@@ -1554,7 +1504,7 @@ function onLoadBody(){
 		for(var j=3;j<ip[i].childNodes.length;j++){
 			recipients.push(ip[i].childNodes[j].innerHTML);
 		}
-		recievePost({author:ip[i].childNodes[0].innerHTML, content:unescapedContent, date:ip[i].childNodes[2].innerHTML, recipients:recipients},true);
+		recievePost({author:ip[i].childNodes[0].innerHTML, content:unescapedContent, date:ip[i].childNodes[2].innerHTML, recipients:recipients});
 	}
 	
 	setIcon("favicon.ico");//maybe this should be *before* page load...
