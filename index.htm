@@ -151,7 +151,7 @@ function sendMessage(path, data, callback, abort){
 		if(abort) abort();
 		ajaxFail();
 	};
-	$.post(path,data,success).fail(fail)
+	$.post(path,data,success).fail(fail);
 }
 
 function closeMessage(){
@@ -984,6 +984,7 @@ function showPreview(ignoreCache){
 		messageHTML = "<strong>"+text+"</strong>";
 	} else {
 		//proper message
+		allowSend(true,"unknowntag");
 		messageHTML = getHTMLfromSavvyCode(composetext, mathpreview);
 	}
 
@@ -1288,7 +1289,8 @@ var scrollLocked = true;
 var autoscrolling = false;
 function scrolledDown(){
 	var posts = document.getElementById("postlist");
-	return posts.scrollTop == posts.scrollHeight - posts.offsetHeight;
+	//seems theres occasionally some kind of rounding error
+	return Math.abs(posts.scrollTop - (posts.scrollHeight - posts.offsetHeight))<2;
 }
 
 //if user set the scroll to the bottom of the postlist, scroll down automatically

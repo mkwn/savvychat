@@ -34,15 +34,20 @@ class Global(db.Model):
 
 	@classmethod
 	def get(cls, key):
-		instance = cls.get_by_key_name(key)
-		if not instance:
-			return None
-		return cls.get_by_key_name(key).value
+		value = memcache.get(key)
+		if not value:
+			instance = cls.get_by_key_name(key)
+			if instance:
+				value = instance.value
+				memcache.set(key=key, value=value)
+			else:
+				return None
+		return value
 
 	@classmethod
 	def set(cls, key, value):
-		entity = cls(key_name=key, value=value)
-		entity.put()
+		memcache.set(key=key, value=value)
+		entity = cls(key_name=key, value=value).put()
 		return value
 
 class Post(db.Model):
@@ -76,8 +81,12 @@ class Whiteuser(db.Model):
 	email = db.EmailProperty()
 	name = db.StringProperty()
 
+class Alias(db.Model):
+	#whitelisted users
+	aliastext = db.StringProperty()
+	meaning = db.StringProperty()
+
 def fetchTokens():
-	#tokens = memcache.get("tokens")
 	#if not tokens:
 	
 	tokens = []	
@@ -176,17 +185,7 @@ def removeWhitespace(data):
 	return ''.join(data.split())
 		
 def resolveStragglers():
-	setMC = False
-	lastFlush = memcache.get("lastFlush")
-	if not lastFlush:
-		setMC = True
-		lastFlush = Global.get("lastFlush")
-		if not lastFlush:
-			lastFlush = "1"
-	lastFlushInt = int(lastFlush)
-	nowInt = int(time.mktime(datetime.utcnow().timetuple()))
-	if setMC:
-		memcache.add(key="lastFlush", value=lastFlush)
+	lastFlush = Global.get("lastFlush")
 	
 	if nowInt-lastFlushInt < 60*60:
 		return
@@ -205,25 +204,32 @@ def resolveStragglers():
 		if expired:
 			chatuser.put()
 
-	memcache.set(key="lastFlush", value=str(nowInt))
 	Global.set("lastFlush", str(nowInt))
+
+def getLastDump():
+	try:
+		startInt = int(Global.get("lastDump"))
+	except TypeError:
+		firstPost = db.GqlQuery("SELECT * FROM Post ORDER BY date ASC").get()
+		if firstPost is None:
+			return 0
+		else:
+			startInt = int(time.mktime(firstPost.date.timetuple()))
+	return startInt
 		
 def checkDump():
 	#check if its been about a day since the last dump
 	#get start time
-	try:
-		startInt = int(Global.get("lastDump"))
-	except TypeError:
-		firstPost=db.GqlQuery("SELECT * FROM Post ORDER BY date ASC").get()
-		if firstPost is None:
-			return
-		else:
-			startInt = int(time.mktime(firstPost.date.timetuple()))
+	startInt = getLastDump()
 
 	#get end time
 	endInt = int(time.mktime(datetime.utcnow().timetuple()))
 	if endInt-startInt > 24*60*60:
-		sendMail(to="mattk210@gmail.com", body=dump(startInt,endInt), subject='SavvyChat Post Dump')
+		autoDump = Global.get("autoDump")
+		if not autoDump: autoDump = ""
+		recipients = autoDump.split()
+		for recipient in recipients:
+			sendMail(to=recipient, body=dump(startInt,endInt,True), subject='SavvyChat Post Dump')
 
 def hlog(text):
 	#hacky log
@@ -282,7 +288,7 @@ def declareUpdate(self):
 	Global.set("lastUpdate",str(lastDate))
 	return self.response.out.write("done")
 
-def dump(startInt, endInt):
+def dump(startInt, endInt, saveLastDump):
 	if endInt - startInt > 1000000 or endInt <  startInt:
 		#request will probably time out, we need to cut the interval
 		endInt = startInt + 1000000
@@ -303,7 +309,8 @@ def dump(startInt, endInt):
 		except AttributeError:
 			authorString = post.author
 		outString += "\n\n" + authorString + " @ " + dateString + ":\n" + post.content
-	Global.set("lastDump", str(endInt))
+	if(saveLastDump):
+		Global.set("lastDump", str(endInt))
 	return outString
 
 def manualDump(self):
@@ -327,34 +334,69 @@ def manualDump(self):
 	if endArg:
 		endInt = int(endArg)
 
-	self.response.headers['Content-Type'] = "text/plain"
-	return self.response.out.write(dump(startInt, endInt))
+	saveLastDump = False
+	if self.request.get('l'):
+		saveLastDump = True
 
-def initWhite(self):
-	whitelistData = open("whitelist.txt")
-	whitelist = whitelistData.readlines()
-	whitelistData.close()
+	self.response.headers['Content-Type'] = "text/plain"
+	return self.response.out.write(dump(startInt, endInt, saveLastDump))
+
+def makeWhitelist():
+	whiteusers = []
+	whiteData = db.GqlQuery("SELECT * FROM Whiteuser")
+	for whiteuser in whiteData:
+		whiteusers += [whiteuser.email+" "+whiteuser.name]
+	return '\n'.join(whiteusers)
+
+def modifyWhitelist(self):
+	#first delete all
+	whiteData = db.GqlQuery("SELECT * FROM Whiteuser")
+	for whiteuser in whiteData:
+		db.delete(whiteuser)
+
+	whitelist = self.request.get("whitelist").split('\n')
 	for emailData in whitelist:
-		if emailData.rstrip() == "":
-			#end of whitelist
-			break
-		email, name = tuple(emailData.rstrip().split(" "))
-		whiteuser = db.GqlQuery("SELECT * FROM Whiteuser WHERE email='" + email + "'").get()
-		if whiteuser: continue
+		try:
+			email, name = tuple(emailData.rstrip().split(" "))
+		except ValueError:
+			continue
 		whiteuser = Whiteuser()
 		whiteuser.name = name
 		whiteuser.email = email
 		whiteuser.put()
-	return self.response.out.write("done")
+	return self.response.out.write(makeWhitelist())
 
-def initNetloc(self):
-	return Global.set("netloc", urlparse.urlsplit(self.request.url)[1])
+def makeAliaslist():
+	aliases = []
+	aliasData = db.GqlQuery("SELECT * FROM Alias")
+	for alias in aliasData:
+		aliases += [alias.aliastext+" "+alias.meaning]
+	return '\n'.join(aliases)
+
+def modifyAliases(self):
+#first delete all`
+	aliasData = db.GqlQuery("SELECT * FROM Alias")
+	for alias in aliasData:
+		db.delete(alias)
+
+	aliaslist = self.request.get("aliaslist").split('\n')
+	for item in aliaslist:
+		try:
+			aliastext, meaning = tuple(item.rstrip().split(" "))
+		except ValueError:
+			continue
+		alias = db.GqlQuery("SELECT * FROM Alias WHERE aliastext='" + aliastext + "'").get()
+		if not alias:
+			alias = Alias()
+		alias.aliastext = aliastext
+		alias.meaning = meaning
+		alias.put()
+	return self.response.out.write(makeAliaslist())
 
 def getNetloc():
 	netloc = Global.get("netloc")
 	if not netloc:
-		Global.set("netloc","savvychat")
-		netloc = "savvychat.appspot.com"
+		netloc = Global.set("netloc", urlparse.urlsplit(self.request.url)[1])
 	return netloc
 
 class PostPage(webapp.RequestHandler):
@@ -678,20 +720,38 @@ class AdminPage(webapp.RequestHandler):
 		if not user:
 			#not logged in, redirect to login page
 			return self.redirect(users.create_login_url('/'))
-		if user.email().lower() != "mattk210@gmail.com":
+		admins = Global.get("admins")
+		if not admins:
+			admins = "test@example.com"
+			Global.set("admins", admins)
+		if not user.email().lower() in admins:
 			return self.redirect('/')
 
 		typeString = self.request.get('type')
 		if not typeString:
+			autoDump = Global.get("autoDump")
+			if not autoDump: autoDump = ""
+			return self.response.out.write(template.render('admin.htm', {
+				'lastDump':getLastDump(),
+				'autoDump':autoDump,
+				'whitelist':makeWhitelist(),
+				'aliases':makeAliaslist()
+			}))
 			return self.response.out.write('<a href="?type=dump">Dump posts</a><br /><a href="?type=white">Initialize whitelist</a><br /><a href="?type=date">Declare update</a><br /><a href="?type=netloc">Initialize netloc</a>')
 		if typeString == "dump":
 			return manualDump(self)
+		if typeString == "autodump":
+			recipients = self.request.get('r')
+			if recipients:
+				Global.set("autoDump",recipients)
+				return
+			return
 		if typeString == "white":
-			return initWhite(self)
+			return modifyWhitelist(self)
+		if typeString == "aliases":
+			return modifyAliases(self)
 		if typeString == "date":
 			return declareUpdate(self)
-		if typeString == "netloc":
-			return initNetloc(self)
 
 class UploadPage(webapp.RequestHandler):
 	def post(self):

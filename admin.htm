@@ -1,0 +1,124 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<link rel="shortcut icon" href="favicon.ico" />
+<link type="text/css" rel="stylesheet" href="stylesheets/main.css" />
+<style type="text/css">
+body{
+margin-top:0;
+}
+h1,h2,h3,h4{
+margin-top: 0;
+}
+h3{
+margin-bottom: -10px;
+}
+#loadingContainer{
+text-align: center;
+}
+#loadingContent{
+text-align: center;
+margin-left: auto ;
+margin-right: auto ;
+width: 500px;
+background-color:#FFF;
+border:solid;
+border-top:none;
+border-color:#DDD;
+border-width:3px;
+}
+</style>
+
+<script type="text/javascript" src="jquery-1.9.1.min.js"></script>
+<title>SavvyChat - Admin</title>
+</head>
+<body>
+<div id="loadingContainer">
+	<div id="loadingContent">
+		<div>
+			<h1>SavvyChat admin options</h1>
+		</div>
+		<div style="padding:10px;text-align:left;background-color:#EEE;">
+			<h3>Modify whitelist</h3>
+				<p>Each line should be of the form <span class="code">email name</span><textarea id="whitelist" style="width:474px;height:200px;">{{ whitelist }}</textarea>
+				<a href="#" id="white">Update</a>
+			<h3>Modify aliases</h3>
+				<p>Each line should be of the form <span class="code">alias meaning</span>, where <span class="code">meaning</span> is a comma-separated list of names<textarea id="aliaslist" style="width:474px;height:200px;">{{ aliases }}</textarea>
+				<a href="#" id="aliases">Update</a>
+			<h3>Autodump recipients</h3>
+				<p>Space-separated list of emails: <input id="recipients" type="text" value="{{ autoDump }}" style="width:250px;" />
+					<br/><a href="#" id="autodump">Update</a></p>
+			<h3>Dump Posts</h3>
+				<p>From UNIX time <input id="start" type="text" value="{{ lastDump }}" /> to <input type="text" id="end" value="now" />
+					<br/><input id="lastDump" type="checkbox" />Start future dumps from here
+					<br/><a href="#" id="dump">View Dump (opens new page)</a></p>
+			<h3>Declare update</h3>
+				<p><a href="#" id="date">Declare</a></p>
+		</div>
+	</div>
+</div>
+
+<script type="text/javascript">
+function newOption(name,data,callback){
+	//var label = $('#'+name).text();
+	$('#'+name).click(function(){
+		if ($('#'+name).text()=="Working...") return;
+		var dataObj = data();
+		if(dataObj.constructor == String){
+			$('#'+name).text(dataObj);
+			return;
+		}
+		dataObj.type = name;
+		$('#'+name).text("Working...")
+		$('#'+name)[0].href = null;
+		sendMessage("/admin",dataObj,function(response){
+			callback(response)
+			$('#'+name).text("Done! Do again?")
+			$('#'+name)[0].href = '#';
+		},function(){
+			$('#'+name).text("Failed! Try again?")
+			$('#'+name)[0].href = '#';
+		});
+		return false;
+	});
+}
+
+newOption("init",function(){return {};},function(){});
+var qq;
+newOption("white",function(){return {whitelist:$("#whitelist").val()};},function(response){qq=response;$("#whitelist").val(response);});
+
+newOption("aliases",function(){return {aliaslist:$("#aliaslist").val()};},function(response){$("#aliaslist").val(response)});
+
+newOption("autodump",function(){return {r:$("#recipients").val()};},function(){});
+
+newOption("dump",function(){
+	var start = Math.round(Number($("#start").val()));
+	if(isNaN(start)) return "Wrong format! Try again?";
+	var URL = "?type=dump&s="+start;
+	if($("#end").val()!="now"){
+		var end = Math.round(Number($("#end").val()));
+		if(isNaN(end)) return "Wrong format! Try again?";
+		URL += "&e="+end;
+	}
+	if($("#lastDump")[0].checked) URL += "&l=true";
+	window.location = URL;
+	return "";
+},function(){});
+
+newOption("date",function(){return {};},function(){});
+
+function sendMessage(path, data, callback, abort){
+	if(!data) $.post(path);
+	var success = function(response){
+		if(callback) callback(response);
+	};
+	var fail = function(){
+		if(abort) abort();
+	};
+	$.get(path,data,success).fail(fail);
+}
+</script>
+
+</body>
+</html>
