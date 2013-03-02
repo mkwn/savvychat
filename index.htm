@@ -35,6 +35,16 @@ MathJax.Hub.Config({
 {% endif %}
 
 <script type="text/javascript">
+
+jQuery.fn.extend({
+    union: function(array1, array2) {
+        var hash = {}, union = [];
+        $.each($.merge($.merge([], array1), array2), function (index, value) { hash[value] = value; });
+        $.each(hash, function (key, value) { union.push(key); } );
+        return union;
+    }
+});
+
 var token = '{{ token }}';
 var tokenid = '{{ tokenid }}';
 var userid = '{{ userid }}';
@@ -48,6 +58,7 @@ var denyretrieve = true;
 {% if showarchive %}var denyretrieve = false;{% else %}var denyretrieve = true;{% endif %}
 {% if hf %}var verbose = true;{% else %}var verbose = false;{% endif %} //are the header and footer shown?
 {% if shiftSend %}var shiftSend = true;{% else %}var shiftSend = false;{% endif %} //shift+enter or enter to send?
+{% if suppressErrors %}var suppressErrors = true;{% else %}var suppressErrors = false;{% endif %}
 var endquerycursor = '{{ endquerycursor }}';
 var startquerycursor = '{{ startquerycursor }}';
 
@@ -150,13 +161,13 @@ function sendMessage(path, data, callback, abort){
 	};
 	var fail = function(){
 		if(abort) abort();
-		ajaxFail();
+		ajaxFail(path);
 	};
 	$.post(path,data,success).fail(fail);
 }
 
 function closeMessage(){
-	sendMessage('/closed', {u:userid, t:tokenid, e:connectionError});
+	sendMessage('/_ah/channel/disconnected/', {from:tokenid, ne:connectionError});
 }
 
 //on establishing a connection
@@ -235,18 +246,16 @@ function refreshToken(time, bypass){
 		//displayNote("Reconnect failed. Retrying in "+time+" seconds. [[Try now@@javascript:clearTimeout(refreshTimeout);refreshToken(1, true);]]");
 		displayNote("Reconnect failed. [[Try now@@javascript:clearTimeout(refreshTimeout);refreshToken(1, true);]]");
 		clearTimeout(refreshTimeout);
-		clearTimeout(expectPingTimeout);
 		clearTimeout(checkConnectionTimeout);
 		//refreshTimeout = setTimeout("refreshToken("+Math.min(time*2,60)+", true);",time*1000);
 		return;
 	}
 	sendMessage('/token',{t:tokenid},callback,abort);
-	allowSend(false,"error");
 }
 
 //when the channel connection fails
 function onClose(){
-	{% if suppressErrors %}return;{% endif %}
+	if(suppressErrors) return;
 	clearTimeout(expectPingTimeout);
 	for(var post in expectedPosts){
 		clearTimeout(expectedPosts[post].timeout)
@@ -265,11 +274,13 @@ function channelFail(){
 }
 
 var suppressAjaxFail = false;
-function ajaxFail(){
+function ajaxFail(request){
 	if(suppressAjaxFail) return;
 	if(inRefreshSequence) return;
 	if(connectionError || authError) return;
-	displayNote("Some request failed or timed out. Maybe you want to [[refresh the channel connection@@javascript:onClose();]] or [[reload the page@@javascript:closeMessage();location.reload();]]. Click [[here@@javascript:suppressAjaxFail=true;]] to make these warnings stop happening.");
+	var requestText = '';
+	if(request) requestText = ' (`'+request+'`)';
+	displayNote("Some request"+requestText+" failed or timed out. Maybe you want to [[refresh the channel connection@@javascript:onClose();]] or [[reload the page@@javascript:closeMessage();location.reload();]]. Click [[here@@javascript:suppressAjaxFail=true;]] to make these warnings stop happening.");
 	onClose();
 }
 
@@ -372,8 +383,8 @@ function onMessage(message){
 		}
 		//this was a post
 		receivePost(m);
-		//play a special tone when someone calls you, no matter what
-		if(gotCalled(m)&&!mute){
+		//play a special tone when someone calls you
+		if(!windowFocus&&gotCalled(m)&&!mute){
 			//play the tone
 			playAlert("call");
 		}
@@ -501,7 +512,7 @@ function sendPost(){
 
 	//if(text == "") return;
 	var callback = function(response){
-		allowSend(true,"post");
+		//allowSend(true,"post");
 
 		//maybe post has been received already
 		var id = Number(response);
@@ -521,14 +532,15 @@ function sendPost(){
 		failNotify.push(noteLog.length - 1);
 	};
 
-	sendMessage('/post', {p:text}, callback, abort)
+	getHTMLfromSavvyCode(text,false,true); // get recipients
+	sendMessage('/post', {p:text,r:recipients}, callback, abort)
 
 	document.getElementById("preview").innerHTML = "";
 	//showPreview(true);
 	document.getElementById("authorpreview").innerHTML = username + ":";
 	backupText = document.getElementById("composefield").value;
 	document.getElementById("composefield").value = "";
-	allowSend(false,"post");
+	//allowSend(false,"post");
 	//receivePost({content:document.getElementById("composefield").value,author:username,date:"1/3/11, 13:30 EST"});
 }
 
@@ -827,10 +839,20 @@ function receivePost(post,prepend,notification){
 	}
 	var parsedDate = formatDate(postdate);
 	var classtext = notification?" notifypost":"";
+	if(gotCalled(post)&&post.author.toLowerCase()!=username.toLowerCase()){
+		classtext = ' callpost';
+	}
 	var quoteHTML = '<a>'+parsedDate+'</a>';
 	var titleHTML = "";
 	//if(gadget) titleHTML = ' title="'+parsedDate+'"';
-	var divHTML='<div class="datelabel">'+quoteHTML+' </div><span class="author">'+post.author+': </span><span class="postcontent">' + messageHtml + '</span>';
+
+	var authortext = post.author+": "
+	if(post.recipients.length>0){
+		console.log(post.recipients)
+		authortext = post.author+" to "+makeRecipientsText(post.recipients)+": ";
+	}
+
+	var divHTML='<div class="datelabel">'+quoteHTML+' </div><span class="author">'+authortext+'</span><span class="postcontent">' + messageHtml + '</span>';
 	var newdiv = document.createElement('div');
 	newdiv.innerHTML = divHTML;
 	if(gadget) newdiv.title = parsedDate
@@ -852,7 +874,7 @@ function receivePost(post,prepend,notification){
 		//hide author label for repeated posts by the same author
 		if(postlist.lastChild){
 			if(messageHtml != ""){
-				if(postlist.lastChild.childNodes[1].innerHTML == post.author+": "){
+				if(postlist.lastChild.childNodes[1].innerHTML == authortext){
 					newdiv.childNodes[1].style.display = "None";
 					addClass(newdiv,"joinedattop");
 					addClass(postlist.lastChild,"joinedatbottom");
@@ -869,7 +891,7 @@ function receivePost(post,prepend,notification){
 		//hide author label for repeated posts by the same author
 		if(postlist.firstChild){
 			if(messageHtml != ""){
-				if(postlist.firstChild.childNodes[1].innerHTML == post.author+": "){
+				if(postlist.firstChild.childNodes[1].innerHTML == authortext){
 					postlist.firstChild.childNodes[1].style.display = "None";
 					addClass(newdiv,"joinedatbottom");
 					addClass(postlist.firstChild,"joinedattop");
@@ -948,6 +970,7 @@ function showPreview(ignoreCache){
 		}
 	}
 
+	var authortext = username+": "
 	var messageHTML = ""
 
 	if(composetext.substring(0,1)=='/'&&composetext.substring(0,2)!='//'){
@@ -978,11 +1001,14 @@ function showPreview(ignoreCache){
 	} else {
 		//proper message
 		allowSend(true,"unknowntag");
-		messageHTML = getHTMLfromSavvyCode(composetext, mathpreview);
+		messageHTML = getHTMLfromSavvyCode(composetext, mathpreview, true);
+		if(recipients.length > 0){
+			authortext = username+" to "+makeRecipientsText(recipients)+": ";
+		}
 	}
 
 	document.getElementById("preview").innerHTML = messageHTML;
-	document.getElementById("authorpreview").innerHTML = username+": ";
+	document.getElementById("authorpreview").innerHTML = authortext;
 
 	//restore mode of spoilers
 	var quotes = document.getElementById("preview").getElementsByTagName("blockquote")
@@ -1001,8 +1027,15 @@ function showPreview(ignoreCache){
 	MJQ([scrollDown]);
 }
 
+var recipients = [];
+function makeRecipientsText(recipients){
+	return recipients.join(", ").replace(/\w[^, ]*/g,function(txt){return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();});
+}
+
 //turn my formatting syntax into HTML for display
-function getHTMLfromSavvyCode(savvyCode, domath){
+function getHTMLfromSavvyCode(savvyCode, domath, handleRecipients){
+	if(handleRecipients) recipients = []
+
 	if(disableMath){
 		domath = false;
 	}
@@ -1032,6 +1065,26 @@ function getHTMLfromSavvyCode(savvyCode, domath){
 		softLinkNameHash.push(RegExp.$1);
 		return "~S";
 	});
+	
+	if(handleRecipients){
+		output = output.replace(/@([a-z]+)/ig, function(){
+			var user = RegExp.$1.toLowerCase();
+			var highlight = false;
+			if(user == "all"){
+				recipients = ["all"]
+				highlight = true;
+			}else for(var alias in aliases){
+				if(aliases[alias].aliastext == user){
+					if(!(recipients[0]&&recipients[0] == "all"))
+						recipients = $().union(recipients,aliases[alias].meaning.split(","));
+					highlight = true;
+					break;
+				}
+			}
+			if(highlight) return '<span class="user">@'+RegExp.$1+"</span>";
+			return '@'+RegExp.$1;
+		});
+	}
 
 	//do formatting
 	var btags = '<strong>$1</strong>';
@@ -1466,12 +1519,7 @@ function onLoadBody(){
 	wh = 0;
 	setTimeout("fitWindow();",100);//some browsers require a few ms to set up the page before resizing can take place
 	//if(!gadget)
-		window.onresize = fitWindow;
-	
-	window.onbeforeunload = function(){
-		//this is flaky
-		closeMessage();
-	}
+	window.onresize = fitWindow;
 	
 	scrollDown();
 	setInterval("scrollDown();showPreview();",300);

@@ -51,10 +51,12 @@ border-width:3px;
 					<br/><a href="#" id="autodump">Update</a></p>
 			<h3>Dump Posts</h3>
 				<p>From UNIX time <input id="start" type="text" value="{{ lastDump }}" /> to <input type="text" id="end" value="now" />
-					<br/><input id="lastDump" type="checkbox" />Start future dumps from here
+					<br/><input id="lastDump" type="checkbox" /><label for="lastDump">Start future dumps from here</label>
 					<br/><a href="#" id="dump">View Dump (opens new page)</a></p>
 			<h3>Declare update</h3>
 				<p><a href="#" id="date">Declare</a></p>
+			<h3>Initialize netloc</h3>
+				<p><a href="#" id="init">Initialize</a></p>
 		</div>
 	</div>
 </div>
@@ -107,6 +109,7 @@ newOption("dump",function(){
 },function(){});
 
 newOption("date",function(){return {};},function(){});
+newOption("init",function(){return {};},function(){});
 
 function sendMessage(path, data, callback, abort){
 	if(!data) $.post(path);

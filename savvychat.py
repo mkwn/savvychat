@@ -157,7 +157,7 @@ def sendMail(to, subject, body, html=None, senderName='SavvyChat Mailer', sender
 			params["html"] = html
 		mail.send_mail(**params)
 		
-def call(self,recipients=[], author="a user", plaincontent="", htmlcontent=""):
+def call(recipients=[], author="a user", plaincontent="", htmlcontent=""):
 	if recipients == []:
 		return
 	#send out emails
@@ -166,7 +166,8 @@ def call(self,recipients=[], author="a user", plaincontent="", htmlcontent=""):
 		#call all
 		chatusers = db.GqlQuery("SELECT * FROM Chatuser")
 		for chatuser in chatusers:
-			TOarray = TOarray + [chatuser.name + ' <' + chatuser.email + '>']
+			if chatuser.name.lower() != author.lower() and len(chatuser.tokens) == 0:
+				TOarray = TOarray + [chatuser.name + ' <' + chatuser.email + '>']
 		pass
 	else:
 		for recipient in recipients:
@@ -179,14 +180,14 @@ def call(self,recipients=[], author="a user", plaincontent="", htmlcontent=""):
 		subject="You have been called by "+author+" with SavvyChat",
 		body=plaincontent,
 		html=htmlcontent)
-	netloc = getNetloc().split('.')
 
 def removeWhitespace(data):
 	return ''.join(data.split())
 		
 def resolveStragglers():
 	lastFlush = Global.get("lastFlush")
-	
+	lastFlushInt = int(lastFlush)
+	nowInt = int(time.mktime(datetime.utcnow().timetuple()))
 	if nowInt-lastFlushInt < 60*60:
 		return
 	#if a computer crashes, they will not be able to send the onClose message
@@ -228,8 +229,9 @@ def checkDump():
 		autoDump = Global.get("autoDump")
 		if not autoDump: autoDump = ""
 		recipients = autoDump.split()
+		if len(recipients)>0: dumptext = dump(startInt,endInt,True)
 		for recipient in recipients:
-			sendMail(to=recipient, body=dump(startInt,endInt,True), subject='SavvyChat Post Dump')
+			sendMail(to=recipient, body=dumptext, subject='SavvyChat Post Dump')
 
 def hlog(text):
 	#hacky log
@@ -250,7 +252,7 @@ def makePostObject(post):
 		author = author.name
 	return {"content":post.content,"author":author,"date":str(time.mktime(post.date.timetuple())),"recipients":post.recipients,"id":post.key().id()}
 
-def doPost(content, author=None, dontSave=False):
+def doPost(content, author=None, dontSave=False, recipients=""):
 	if not author:
 		user = users.get_current_user()
 		if not user:
@@ -262,9 +264,8 @@ def doPost(content, author=None, dontSave=False):
 	post = Post()
 	post.author = author or user.user_id()
 	post.content = content
-
-	post.recipients = []
-
+	if recipients == "": post.recipients = []
+	else: post.recipients = recipients.split(",")
 	if dontSave:
 		post.date = datetime.now()
 	else:
@@ -273,11 +274,9 @@ def doPost(content, author=None, dontSave=False):
 	if not author:
 		authoruser.lastonline = datetime.utcnow()
 		authoruser.put()
-	try:
-		return post.key().id() #id for the post
-	except:
-		pass
-	#call(post.recipients,authoruser.name,contenttext)
+	if len(recipients)>0:
+		call(post.recipients,authoruser.name,content,content)
+	return post.key().id() #id for the post
 
 def declareUpdate(self):
 	lastDate = datetime.utcnow().date()
@@ -366,11 +365,24 @@ def modifyWhitelist(self):
 		whiteuser.put()
 	return self.response.out.write(makeWhitelist())
 
-def makeAliaslist():
+def makeAliaslist(onlyChatusers=False,ignoreUser=None):
 	aliases = []
+	if onlyChatusers:
+		chatuserList = []
+		chatuserQuery = db.GqlQuery("SELECT * FROM Chatuser")
+		for chatuser in chatuserQuery:
+			if chatuser.name != ignoreUser:
+				chatuserList += [chatuser.name.lower()]
+				aliases += [chatuser.name.lower()+" "+chatuser.name.lower()]
 	aliasData = db.GqlQuery("SELECT * FROM Alias")
 	for alias in aliasData:
-		aliases += [alias.aliastext+" "+alias.meaning]
+		if onlyChatusers:
+			aliasusers = alias.meaning.lower().split(",")
+			meaning = ",".join(list(set(chatuserList).intersection(aliasusers)))
+		else:
+			meaning = alias.meaning
+		if meaning != "":
+			aliases += [alias.aliastext+" "+meaning]
 	return '\n'.join(aliases)
 
 def modifyAliases(self):
@@ -393,47 +405,21 @@ def modifyAliases(self):
 		alias.put()
 	return self.response.out.write(makeAliaslist())
 
-def getNetloc():
+def initNetloc(self):
+        return Global.set("netloc", urlparse.urlsplit(self.request.url)[1])
+
+def getNetloc(self=None):
 	netloc = Global.get("netloc")
 	if not netloc:
-		netloc = Global.set("netloc", urlparse.urlsplit(self.request.url)[1])
+		if self: initNetloc(self)
 	return netloc
 
 class PostPage(webapp.RequestHandler):
 	def post(self):
 		#called on recieving a post
-		self.response.out.write(str(doPost(self.request.get('p'))))
-		
-class CallPage(webapp.RequestHandler):
-	def post(self):
-		user = users.get_current_user()
-		if not user:
-			return
-		chatuser = getUserFromId(user.user_id())
-		if not chatuser:
-			return
-		recipients=[]
-		callstring = ',' + self.request.get('r').lower() + ','
-		if callstring == ",,":
-			#no arguments, call all
-			recipients = ["all"]
-		else:
-			#replace aliases
-			aliasData = open("aliases.txt")
-			aliasList = aliasData.readlines()
-			aliasData.close()
-			for aliasRow in aliasList:
-				#replace aliases
-				alias, result = tuple(aliasRow.rstrip().split(" "))
-				callstring = callstring.replace(","+alias+",",","+result+",")
-			recipients = list(Set(callstring.split(",")[1:-1]))
-			if "all" in recipients:
-				recipients = ["all"]
-		chatuser.lastonline = datetime.utcnow()
-		chatuser.put()
-		call(self,recipients,chatuser.name,
-			"no plaintext preview available, sign in to savvychat (http://savvychat.appspot.com) to view message",
-			decompressHTML(self.request.get('h')))
+		recipients = self.request.get('r')
+		if not recipients: recipients = ""
+		self.response.out.write(str(doPost(self.request.get('p'),recipients=recipients)))
 			
 class RetrievePage(webapp.RequestHandler):
 	#there is a request for more of the post archive
@@ -527,18 +513,18 @@ class TokenPage(webapp.RequestHandler):
 		#serve token
 		self.response.out.write(tokenid + '@@' + token)
 		
-class ClosedPage(webapp.RequestHandler):
-	#This is for when someone disconnects, to get rid of their token
+class disconnectPage(webapp.RequestHandler):
 	def post(self):
-		chatuser = getUserFromId(self.request.get('u'))
-		tokenindex = chatuser.tokens.index(self.request.get('t'))
-		try:
-			tokenindex = chatuser.tokens.index(self.request.get('t'))
-			delToken(chatuser, tokenindex)
-		except ValueError:
-			#token has been removed already
-			pass
-		if not self.request.get('e'):
+		tokenid = self.request.get('from')
+		#who knows where it came from
+		chatusers = db.GqlQuery("SELECT * FROM Chatuser")
+		for chatuser in chatusers:
+			try:
+				tokenindex = chatuser.tokens.index(tokenid)
+				delToken(chatuser, tokenindex)
+				break
+			except ValueError: pass
+		if self.request.get('ne'):
 			#we didn't error out, this user has seen all messages
 			chatuser.lastonline = datetime.utcnow()
 		chatuser.put()
@@ -689,6 +675,7 @@ class MainPage(webapp.RequestHandler):
 		
 		#inject template values and render
 		template_values = {'token': token,
+							'aliaslist': makeAliaslist(True,chatuser.name),
 							'posts': posts,
 							'userid': userid,
 							'tokenid': tokenid,
@@ -737,7 +724,6 @@ class AdminPage(webapp.RequestHandler):
 				'whitelist':makeWhitelist(),
 				'aliases':makeAliaslist()
 			}))
-			return self.response.out.write('<a href="?type=dump">Dump posts</a><br /><a href="?type=white">Initialize whitelist</a><br /><a href="?type=date">Declare update</a><br /><a href="?type=netloc">Initialize netloc</a>')
 		if typeString == "dump":
 			return manualDump(self)
 		if typeString == "autodump":
@@ -746,6 +732,8 @@ class AdminPage(webapp.RequestHandler):
 				Global.set("autoDump",recipients)
 				return
 			return
+		if typeString == "init":
+			return initNetloc(self)
 		if typeString == "white":
 			return modifyWhitelist(self)
 		if typeString == "aliases":
@@ -789,28 +777,27 @@ class GadgetXMLPage(webapp.RequestHandler):
 		disableMath = False
 		if self.request.get('disableMath'):
 			disableMath = True
-		template_values = {'netloc':getNetloc(),'disableMath':disableMath}
+		template_values = {'netloc':getNetloc(self),'disableMath':disableMath}
 		return self.response.out.write(template.render('gadget.xml', template_values))
 
 class HelpPage(webapp.RequestHandler):
 	def get(self):
-		return self.response.out.write(template.render('help.htm', {'netloc':getNetloc()}))
+		return self.response.out.write(template.render('help.htm', {'netloc':getNetloc(self)}))
 		
 application = webapp.WSGIApplication([
 									('/', MainPage),
 									('/post', PostPage),
-									('/call', CallPage),
 									('/retrieve', RetrievePage),
 									('/sync', SyncPage),
 									('/ping', PingPage),
+									('/_ah/channel/disconnected/', disconnectPage),
 									('/options', OptionsPage),
 									('/token', TokenPage),
 									('/upload', UploadPage),
 									('/admin', AdminPage),
 									('/download/(\d+)/(.*)', DownloadHandler),
 									('/gadget\\.xml', GadgetXMLPage),
-									('/help', HelpPage),
-									('/closed', ClosedPage)])
+									('/help', HelpPage)])
 
 def main():
 	#resolveStragglers()
