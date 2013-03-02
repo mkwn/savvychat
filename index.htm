@@ -51,6 +51,7 @@ var denyretrieve = true;
 var endquerycursor = '{{ endquerycursor }}';
 var startquerycursor = '{{ startquerycursor }}';
 
+var aliases = [];
 var socket;
 var checkConnectionTimeout = null;
 var currPostID = 0;
@@ -494,7 +495,7 @@ function sendPost(){
 	}
 
 	if(disableSend) return;
-	
+
 	var thisPost = {startTime:(new Date()).getTime(),text:document.getElementById("composefield").value}
 	expectedPosts.push(thisPost);
 
@@ -736,10 +737,6 @@ function hashstuff(text,codehash,mathhash,linkhashname,linkhashurl){
 
 function formatQuote(content){
 	var worktext = content.replace(/^\|\|[\s\S]*?\|\|/,"").replace(/\r/g,"");
-	if(/^\|+([^\|]+?)(\|+|$)([\s\S]*)/.test(worktext)){
-		//remove meta if necessary
-		worktext = RegExp.$3;
-	}
 	
 	//find something formatted like a link
 	worktext = "\r" + worktext + "\r";
@@ -833,10 +830,6 @@ function receivePost(post,prepend,notification){
 	var quoteHTML = '<a>'+parsedDate+'</a>';
 	var titleHTML = "";
 	//if(gadget) titleHTML = ' title="'+parsedDate+'"';
-	//if(metahead != "cont"){
-		//var escapedPost = post.content.replace(/\\/g,"\\\\").replace(/\n/g,"\\n").replace(/"/g,"\\&quot;");
-		//quoteHTML = '<a href="" onclick="autoquote(&quot;'+escapedPost+'&quot;,&quot;'+post.author+'&quot;,&quot;'+parsedDate+'&quot;);return false;" title="quote this post">'+parsedDate+'</a>';
-	//}
 	var divHTML='<div class="datelabel">'+quoteHTML+' </div><span class="author">'+post.author+': </span><span class="postcontent">' + messageHtml + '</span>';
 	var newdiv = document.createElement('div');
 	newdiv.innerHTML = divHTML;
@@ -1013,17 +1006,12 @@ function getHTMLfromSavvyCode(savvyCode, domath){
 	if(disableMath){
 		domath = false;
 	}
-	//escape stuff
-	var worktext = savvyCode.replace(/\r\n/g,"\n").replace(/\r/g,"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/\>/g,"&gt;").replace(/"/g,"&quot;").replace(/\\\(/g,"\\<a></a>(");
+	//escape stuff. ~ is my escape character.
+	var worktext = savvyCode.replace(/\r\n/g,"\n").replace(/\r/g,"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/\>/g,"&gt;").replace(/"/g,"&quot;").replace(/\\\(/g,"\\<a></a>(").replace(/~/g,"~T");
 	
 	var multiline = true; //no longer necessary
 
 	if(worktext == "") worktext = " ";
-	//find something formatted like a link
-	worktext = "\r" + worktext + "\r";
-	worktext = worktext.replace(/(\s(&gt;)*)((ht|f)tp(s?)\:\/\/[\S]*)(\s)/g,"$1[[$3]]$6");
-	worktext = worktext.replace(/(\s(&gt;)*)((ht|f)tp(s?)\:\/\/[\S]*)(\s)/g,"$1[[$3]]$6");
-	//two passes to remove adjacent links
 	
 	//hash code and math so we can do formatting on the rest
 	var codehash = [];
@@ -1031,14 +1019,24 @@ function getHTMLfromSavvyCode(savvyCode, domath){
 	var linkhashname = [];
 	var linkhashurl = [];
 	var output = hashstuff(worktext,codehash,mathhash,linkhashname,linkhashurl)
+
+	//http://daringfireball.net/2010/07/improved_regex_for_matching_urls
+	var urlRegEx = /\b((?:https?:\/\/|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}\/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:'".,<>?«»“”‘’]))/ig;
+	var softLinkNameHash = [];
+	var softLinkHash = [];
+	output = output.replace(urlRegEx, function(){
+		link = RegExp.$1;
+		if(link.substring(0,7)!="http://" && link.substring(0,8)!="https://")
+			link = "http://"+link;
+		softLinkHash.push(link);
+		softLinkNameHash.push(RegExp.$1);
+		return "~S";
+	});
+
 	//do formatting
 	var btags = '<strong>$1</strong>';
 	var itags = '<em>$1</em>';
 	var stags = '<span class="strikethrough">$1</span>';
-	
-	//output = output.replace(/\*\*\*\*/g,"");
-	//output = output.replace(/\/\/\/\//g,"");
-	//output = output.replace(/____/g,"");
 
 	output = output.replace(/\*\*([\s\S]*?)\*\*/g,btags).replace(/\*\*([\s\S]*?)$/,btags);
 	output = output.replace(/\/\/([\s\S]*?)\/\//g,itags).replace(/\/\/([\s\S]*?)$/,itags)
@@ -1058,12 +1056,19 @@ function getHTMLfromSavvyCode(savvyCode, domath){
 	var citags = ['<span class="code tex2jax_ignore">','</span>'];
 	var cbtags = ['<pre class="code tex2jax_ignore">','</pre>'];
 	var atags = ['<a target="_blank" href="[[">','</a>'];
+	var softatags = ['<a target="_blank" href="~S">','</a>'];
 	var mitags = ['<span class="mathplaceholderinline">','</span>'];
 	var mbtags = ['<div class="mathplaceholderblock">','</div>'];
 	if(domath){
 		mitags = ['\\(','\\)'];
 		mbtags = ['$$',' $$'];
 	}
+
+	//put back soft links
+	linkparts = output.split("~S");
+	output = interleave(linkparts,softLinkNameHash,softatags[0],softatags[1],softatags[0],softatags[1]);
+	linkparts = output.split("~S");
+	output = interleave(linkparts,softLinkHash,"","","","");
 	
 	//put back code
 	if(multiline) output = "\r" + output + "\r";
@@ -1088,7 +1093,7 @@ function getHTMLfromSavvyCode(savvyCode, domath){
 	while(output.indexOf('`<em></em><span class="code') >= 0){
 		output = output.replace(/`<em><\/em><span class="code(.+?)>/g,'<span class="code$1>`');
 	}
-	return output;
+	return output.replace(/~T/g,"~");
 }
 
 //recursive helper function that uses an undocumented feature of replace() to parse nested ">" quote tags
@@ -1427,6 +1432,12 @@ function onLoadBody(){
 	//this is the stuff we want to call after all the page has been loaded
 
 	MJQT("dummy");//hack to fix a mathjax bug
+
+	aliasesData=$("#aliaslist").text().split("\n");
+	for(var alias in aliasesData){
+		aliasData = aliasesData[alias].split(" ");
+		aliases.push({aliastext:aliasData[0],meaning:aliasData[1]});
+	}
 		
 	//display all the elements that were hidden while loading
 	document.getElementById("container").style.display = "block";
@@ -1628,6 +1639,7 @@ function goToView(dest) {
 <div id="dummy" style="display:none;">$$$=\newcommand{\angle}[1]{ {\overline #1|} }$$</div>
 <!--The following is a dummy div where all the initial posts can be dumped while escaping unicode etc-->
 <pre id="initialposts" style="display:none;">{% for post in posts %}<pre><pre>{{ post.author }}</pre><pre>{{ post.content|escape }}</pre><pre>{{ post.date }}</pre>{% for recipient in post.recipients %}<pre>{{ recipient }}</pre>{% endfor %}</pre>{% endfor %}</pre>
+<pre id="aliaslist" style="display:none;">{{ aliaslist|escape }}</pre>
 
 </body>
 </html>
