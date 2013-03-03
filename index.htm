@@ -486,7 +486,7 @@ newCommand("sync",function(){return syncing?"!Syncing in progress, command disab
 
 newCommand("ping",function(){return pinging?"!Pinging in progress, command disabled":"check whether the channel is open";},function(){ping();});
 
-newCommand("refresh",function(){return refreshing?"!Refreshing in progress, command disabled":"request a new channel token to refresh the connection";},function(){refreshToken();});
+//newCommand("refresh",function(){return refreshing?"!Refreshing in progress, command disabled":"request a new channel token to refresh the connection";},function(){refreshToken();});
 
 newCommand("upload",function(){return "open upload dialog";},function(){showUpload();});
 
@@ -728,12 +728,11 @@ function hashstuff(text,codehash,mathhash,linkhashname,linkhashurl){
 			//we split the link into its label and URL and if no label is defined, give it the URL as the label
 			linkdata = linkparts.shift().replace(/\$\$/g,"$\r$\r").replace(/\[\[/g,"[\r[\r").split("@@");
 			if(linkdata.length == 1){
+				if(linkdata[0]=="img") linkdata[0] = "~I";
 				linkdata.unshift(linkdata[0]);
 			}
-			//If the url is not prefixed with a protocol, add one
-			if(!/^(ht|f)tp(s?)\:\/\/|^javascript:/.test(linkdata[1])){
-				linkdata[1] = "http://"+linkdata[1];
-			}
+			linkdata[1] = addHTTPtoURL(linkdata[1]);
+			console.log(linkdata[1])
 			linkhashurl.push(linkdata[1].replace(/\s/g,""));
 			linkhashname.push(linkdata[0]);
 			worktext = linkparts.join("]]");
@@ -1031,6 +1030,13 @@ function makeRecipientsText(recipients){
 	return recipients.join(", ").replace(/\w[^, ]*/g,function(txt){return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();});
 }
 
+function addHTTPtoURL(URL){
+	if(!/^(ht|f)tp(s?)\:\/\/|^javascript:/.test(URL)){
+		return "http://"+URL;
+	}
+	return URL;
+}
+
 //turn my formatting syntax into HTML for display
 function getHTMLfromSavvyCode(savvyCode, domath, handleRecipients){
 	if(handleRecipients) recipients = []
@@ -1039,7 +1045,14 @@ function getHTMLfromSavvyCode(savvyCode, domath, handleRecipients){
 		domath = false;
 	}
 	//escape stuff. ~ is my escape character.
-	var worktext = savvyCode.replace(/\r\n/g,"\n").replace(/\r/g,"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/\>/g,"&gt;").replace(/"/g,"&quot;").replace(/\\\(/g,"\\<a></a>(").replace(/~/g,"~T");
+	var worktext = savvyCode
+		.replace(/\r\n/g,"\n")
+		.replace(/\r/g,"")
+		.replace(/&/g,"&amp;")
+		.replace(/</g,"&lt;")
+		.replace(/\>/g,"&gt;")
+		.replace(/"/g,"&quot;")
+		.replace(/\\\(/g,"\\<a></a>(").replace(/~/g,"~T");
 	
 	var multiline = true; //no longer necessary
 
@@ -1058,8 +1071,7 @@ function getHTMLfromSavvyCode(savvyCode, domath, handleRecipients){
 	var softLinkHash = [];
 	output = output.replace(urlRegEx, function(){
 		link = RegExp.$1;
-		if(link.substring(0,7)!="http://" && link.substring(0,8)!="https://")
-			link = "http://"+link;
+		link = addHTTPtoURL(link)
 		softLinkHash.push(link);
 		softLinkNameHash.push(RegExp.$1);
 		return "~S";
@@ -1103,7 +1115,7 @@ function getHTMLfromSavvyCode(savvyCode, domath, handleRecipients){
 	
 	var citags = ['<span class="code tex2jax_ignore">','</span>'];
 	var cbtags = ['<pre class="code tex2jax_ignore">','</pre>'];
-	var atags = ['<a target="_blank" href="[[">','</a>'];
+	var atags = ['~A1','~A2'];
 	var softatags = ['<a target="_blank" href="~S">','</a>'];
 	var mitags = ['<span class="mathplaceholderinline">','</span>'];
 	var mbtags = ['<div class="mathplaceholderblock">','</div>'];
@@ -1122,14 +1134,20 @@ function getHTMLfromSavvyCode(savvyCode, domath, handleRecipients){
 	if(multiline) output = "\r" + output + "\r";
 	codeparts = output.split("``");
 	output = interleave(codeparts,codehash,citags[0],citags[1],cbtags[0],cbtags[1]);
-	
-	//put back text part of links
-	linkparts = output.split("[[");
-	output = interleave(linkparts,linkhashname,atags[0],atags[1],atags[0],atags[1]);
 
 	//put back links
 	linkparts = output.split("[[");
-	output = interleave(linkparts,linkhashurl,'','','','');
+	output = interleave(linkparts,linkhashname,atags[0],atags[1],atags[0],atags[1]);
+	var imgonload = "setTimeout(&quot;scrollDown();&quot;,1);"
+	output = output
+		.replace(/^(\r*)~A1img~A2/,'\n$1~A1img~A2')
+		.replace(/~A1img~A2/g,'<a target="_blank" href="~U"><img onerror="'+imgonload+'" onload="'+imgonload+'" src="[[" /'+'></a>')
+		.replace(/~A1(.*)~A2/g,'<a target="_blank" href="[[">$1</a>');
+	linkparts = output.split("[[");
+	output = interleave(linkparts,linkhashurl,atags[0],atags[1],atags[0],atags[1])
+		.replace(/~I/g,"img")
+		.replace(/~U(.*)~A1(.*)~A2/g,"$2$1$2")
+		.replace(/~A1|~A2/g,"");
 	
 	//put back math
 	if(multiline) output = "\r" + output + "\r";
@@ -1433,21 +1451,6 @@ function fitWindow(){
 				document.getElementById('alertchecklabel').innerHTML = "play alert tone";
 			}
 		}
-		//refit images
-		var images = document.getElementsByTagName('img');
-		for(var i = 0; i < images.length; i++){
-			images[i].style.width = "auto";
-			naturalWidth = images[i].offsetWidth;
-			naturalHeight = images[i].offsetHeight;
-			var cap = naturalHeight > 200;
-			var capWidth = naturalWidth/naturalHeight*200;
-			images[i].style.width = "100%";
-			if(images[i].offsetWidth > naturalWidth || (cap && images[i].offsetWidth > capWidth)){
-				if(cap) images[i].style.width = capWidth+"px";
-				else images[i].style.width = "auto";
-			}
-		
-		}
 	}
 	if(widthchanged || wh != windowHeight()){
 		wh = windowHeight();
@@ -1487,7 +1490,7 @@ function onLoadBody(){
 
 	MJQT("dummy");//hack to fix a mathjax bug
 
-	aliasesData=$("#aliaslist").text().split("\n");
+	var aliasesData=$("#aliaslist").text().split("\n");
 	for(var alias in aliasesData){
 		aliasData = aliasesData[alias].split(" ");
 		aliases.push({aliastext:aliasData[0],meaning:aliasData[1]});
@@ -1558,7 +1561,6 @@ function onLoadBody(){
 	document.getElementById("uploadform").onsubmit = function() {
 		document.getElementById("uploadform").target = "uploadtarget";
 		hideUpload();
-		//loadiFrame = displayUpload;
 	}
 	document.getElementById("uploadinput").value = "";
 	document.getElementById("uploadbutton").disabled = true;
@@ -1578,21 +1580,6 @@ function onLoadBody(){
 	setIcon("favicon.ico");//maybe this should be *before* page load...
 	
 	openChannel();
-}
-
-//display the url of the uploaded object
-function displayUpload(){
-	var data = frames['uploadtarget'].document.getElementsByTagName("body")[0].innerHTML;
-	hideUpload();
-	/\.(.*)$/.exec(data);
-	var e = RegExp.$1;
-	var path = document.location.href.replace(/[^/]*$/,"") + data;
-	var str = "[[" + path + "]]";
-	if(e=="png"||e=="jpg"||e=="jpeg"||e=="gif"||e=="bmp"){
-		str = "|img|"+path;
-	}
-	document.getElementById("composefield").value = str;
-	showPreview();
 }
 
 function onBlur (){

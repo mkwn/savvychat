@@ -766,9 +766,9 @@ class UploadPage(webapp.RequestHandler):
 			return
 		path = "download/"+str(file.key().id()) + "/" + filename
 		fullpath = "http://" + self.request.host + "/" + path
-		post = "[[" + fullpath+ "]]"
-		#if file.type.find("image") != -1:
-		#	post = "|img|" + fullpath
+		post = "uploaded file: [[" + fullpath+ "]]"
+		if file.type.find("image") != -1:
+			post = "uploaded image:\n[[img@@" + fullpath+ "]]"
 		doPost(post)
 		self.response.out.write(path)
 		#self.response.headers['Content-Type'] = file.type
