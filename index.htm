@@ -35,16 +35,6 @@ MathJax.Hub.Config({
 {% endif %}
 
 <script type="text/javascript">
-
-jQuery.fn.extend({
-    union: function(array1, array2) {
-        var hash = {}, union = [];
-        $.each($.merge($.merge([], array1), array2), function (index, value) { hash[value] = value; });
-        $.each(hash, function (key, value) { union.push(key); } );
-        return union;
-    }
-});
-
 var token = '{{ token }}';
 var tokenid = '{{ tokenid }}';
 var userid = '{{ userid }}';
@@ -72,7 +62,17 @@ var mute = false;
 
 var channelWaitLeniency = 10*1000;
 $.ajaxSetup({timeout:10*1000});
-var connectionCheckInterval = 5*60*1000;
+var connectionCheckInterval = 60*1000;
+
+//http://stackoverflow.com/questions/3629817/getting-a-union-of-two-arrays-in-javascript
+jQuery.fn.extend({
+    union: function(array1, array2) {
+        var hash = {}, union = [];
+        $.each($.merge($.merge([], array1), array2), function (index, value) { hash[value] = value; });
+        $.each(hash, function (key, value) { union.push(key); } );
+        return union;
+    }
+});
 
 //http://codingrecipes.com/onmouseout-fix-on-nested-elements-javascript
 function is_child_of(parent, child){
@@ -167,14 +167,14 @@ function sendMessage(path, data, callback, abort){
 }
 
 function closeMessage(){
-	sendMessage('/_ah/channel/disconnected/', {from:tokenid, ne:connectionError});
+	sendMessage('/_ah/channel/disconnected/', {from:tokenid});
 }
 
 //on establishing a connection
 function onOpen(){
 	sync();
 	clearTimeout(checkConnectionTimeout);
-	checkConnectionTimeout = setTimeout("ping(false);",1000);
+	checkConnectionTimeout = setTimeout("heartbeat();",1000);
 }
 
 var allowSendCauses = {};
@@ -191,7 +191,6 @@ function allowSend(allow,cause){
 	document.getElementById('postbutton').disabled = false;
 }
 
-var failNotify = [];
 var refreshing = false;
 var inRefreshSequence = false; // true even if in the waiting period between refreshes
 var refreshTimeout = null;
@@ -271,6 +270,8 @@ function channelFail(){
 	if(suppressChannelFail) return;
 	if(connectionError || authError) return;
 	displayNote("SavvyChat's communication channel seems slow, flaky or broken. Maybe you want to [[refresh the channel connection@@javascript:onClose();]] or [[reload the page@@javascript:closeMessage();location.reload();]]. Click [[here@@javascript:suppressChannelFail=true;]] to make these warnings stop happening.");
+	clearTimeout(checkConnectionTimeout)
+	checkConnectionTimeout = setTimeout("heartbeat();",connectionCheckInterval);
 }
 
 var suppressAjaxFail = false;
@@ -357,7 +358,7 @@ if (!('indexOf' in Array.prototype)) {
 
 function gotCalled(post){
 	if(post.recipients&&post.recipients.length!=0){
-		if(post.recipients[0]=="all"||post.recipients.indexOf(username.toLowerCase())!=-1){
+		if(post.recipients.indexOf(username.toLowerCase())!=-1){
 			return true;
 		}
 	}
@@ -372,7 +373,7 @@ function onMessage(message){
 
 	//every 5 minutes we should try a ping
 	clearTimeout(checkConnectionTimeout);
-	checkConnectionTimeout = setTimeout("ping(false);",connectionCheckInterval);
+	checkConnectionTimeout = setTimeout("heartbeat();",connectionCheckInterval);
 	
 	var m = $.parseJSON(message.data);
 
@@ -384,9 +385,11 @@ function onMessage(message){
 		//this was a post
 		receivePost(m);
 		//play a special tone when someone calls you
-		if(!windowFocus&&gotCalled(m)&&!mute){
-			//play the tone
-			playAlert("call");
+		if(gotCalled(m)){
+			sendMessage("/callack",{"id":m.id}); //call acknowledgement
+			if(!windowFocus&&!mute){
+				playAlert("call");
+			}
 		}
 		
 		if(!windowFocus&&!alerted){
@@ -415,6 +418,8 @@ function onMessage(message){
 		pingChannelTime = (new Date()).getTime();
 		if(pingAjaxTime != -1) reportPing();
 	}
+	if(m.heartbeat)
+		clearTimeout(expectHeartbeatTimeout);
 }
 
 function reportPing(){
@@ -423,11 +428,9 @@ function reportPing(){
 	avgChannelLatency = (avgChannelLatency*numLatencies+channelLatency)/(numLatencies+1);
 	avgAjaxLatency = (avgAjaxLatency*numLatencies+ajaxLatency)/(numLatencies+1);
 	numLatencies++;
-	if(notifyPing){
-		var note = "Ping successful.\nChannel response latency: " + channelLatency + " ms. (Avg "+Math.round(avgChannelLatency)+")."+
-			"\nAJAX response latency: " + ajaxLatency + " ms. (Avg "+Math.round(avgAjaxLatency)+").";
-		displayNote(note);
-	}
+	var note = "Ping successful.\nChannel response latency: " + channelLatency + " ms. (Avg "+Math.round(avgChannelLatency)+")."+
+		"\nAJAX response latency: " + ajaxLatency + " ms. (Avg "+Math.round(avgAjaxLatency)+").";
+	displayNote(note);
 	pinging = false;
 	showPreview(true);
 }
@@ -481,7 +484,7 @@ newCommand("math",function(){return (dopreview?"disable":"enable")+" live previe
 
 newCommand("sync",function(){return syncing?"!Syncing in progress, command disabled":"synchronize the discussion in case you failed to receive some messages";},function(){sync();});
 
-newCommand("ping",function(){return pinging?"!Pinging in progress, command disabled":"check whether the channel is open";},function(){ping(true);});
+newCommand("ping",function(){return pinging?"!Pinging in progress, command disabled":"check whether the channel is open";},function(){ping();});
 
 newCommand("refresh",function(){return refreshing?"!Refreshing in progress, command disabled":"request a new channel token to refresh the connection";},function(){refreshToken();});
 
@@ -529,11 +532,11 @@ function sendPost(){
 	var abort = function(){
 		var note = 'Your post may have failed to send:\n\n`'+thisPost.text.replace(/`/g,"``")+"`";
 		displayNote(note);
-		failNotify.push(noteLog.length - 1);
 	};
 
 	getHTMLfromSavvyCode(text,false,true); // get recipients
-	sendMessage('/post', {p:text,r:recipients}, callback, abort)
+	console.log(recipients)
+	sendMessage('/post', {p:text,r:recipients.join(",")}, callback, abort)
 
 	document.getElementById("preview").innerHTML = "";
 	//showPreview(true);
@@ -587,10 +590,6 @@ function sync(){
 		startquerycursor = m.cursor;
 		receiveSync(m.posts);
 		syncing = false;
-		for(var note in failNotify){
-			displayNote(noteLog[failNotify[note]],true);
-		}
-		failNotify = [];
 		showPreview(true);
 		if(syncInterrupt){
 			sync();
@@ -606,10 +605,8 @@ var expectPingTimeout = null;
 var pingAjaxTime=-1;
 var pingChannelTime=-1;
 var pinging = false;
-var notifyPing = false;
 var pingStartTime;
-function ping(notify){
-	notifyPing = notify;
+function ping(){
 	if(pinging) return;
 	pinging = true;
 	showPreview(true);
@@ -622,16 +619,18 @@ function ping(notify){
 	};
 	var abort = function(response){
 		pinging = false;
-		if(notifyPing){
-			var note = 'Ping failed.';
-			displayNote(note);
-			failNotify.push(note);
-		}
 	};
 	sendMessage('/ping', {t:tokenid}, callback, abort);
 	pingStartTime = (new Date()).getTime();
 	pingAjaxTime = -1;
 	pingChannelTime = -1;
+}
+
+var expectHeartbeatTimeout = null;
+function heartbeat(){
+	sendMessage('/heartbeat', {t:tokenid,test:false});
+	clearTimeout(expectHeartbeatTimeout);
+	expectHeartbeatTimeout = setTimeout("channelFail();",channelWaitLeniency);
 }
 
 //process the archive
@@ -838,7 +837,7 @@ function receivePost(post,prepend,notification){
 		postdate = new Date(parseFloat(post.date)*1000);
 	}
 	var parsedDate = formatDate(postdate);
-	var classtext = notification?" notifypost":"";
+	var classtext = notification||post.id=="dontSave"?" notifypost":"";
 	if(gotCalled(post)&&post.author.toLowerCase()!=username.toLowerCase()){
 		classtext = ' callpost';
 	}
@@ -1067,16 +1066,12 @@ function getHTMLfromSavvyCode(savvyCode, domath, handleRecipients){
 	});
 	
 	if(handleRecipients){
-		output = output.replace(/@([a-z]+)/ig, function(){
+		output = output.replace(/@(\w+)/ig, function(){
 			var user = RegExp.$1.toLowerCase();
 			var highlight = false;
-			if(user == "all"){
-				recipients = ["all"]
-				highlight = true;
-			}else for(var alias in aliases){
+			for(var alias in aliases){
 				if(aliases[alias].aliastext == user){
-					if(!(recipients[0]&&recipients[0] == "all"))
-						recipients = $().union(recipients,aliases[alias].meaning.split(","));
+					recipients = $().union(recipients,aliases[alias].meaning.split(","));
 					highlight = true;
 					break;
 				}
@@ -1151,7 +1146,8 @@ function getHTMLfromSavvyCode(savvyCode, domath, handleRecipients){
 
 //recursive helper function that uses an undocumented feature of replace() to parse nested ">" quote tags
 function addQuotes(savvyCode){
-	var content = savvyCode.replace(/([\n\r])&gt;/g,"$1").replace(/^\n|\n$/g,'').replace(/([\r\n]&gt;.*?)+[\r\n]/g,function(savvyCode){return addQuotes(savvyCode);})+"\r";
+	console.log(savvyCode.replace(/\\r/g,"\\r"))
+	var content = savvyCode.replace(/([\n\r])&gt;/g,"$1")/*.replace(/^\n|\n$/g,'')*/.replace(/([\r\n]&gt;.*?)+[\r\n]/g,function(savvyCode){return addQuotes(savvyCode);})+"\r";
 	if(content.replace(/\r/g,"") == ""){
 		content = "<br /"+">";
 	}
@@ -1162,7 +1158,12 @@ function addQuotes(savvyCode){
 
 		return '\r<blockquote class="spoiler"><a onclick="if(this.nextSibling.style.display==&quot;none&quot;){this.nextSibling.style.display=&quot;block&quot;;scrollDown();}else{this.nextSibling.style.display=&quot;none&quot;}return false;" href="">Show/Hide <span class="collapsetitle">' + RegExp.$1 + '</span></a><div style="display:none;">' + content + '</div></blockquote>\r';
 	}
-	return '\r<blockquote>\r' + content + '\r</blockquote>\r';
+	var openingnewline = ""
+	if(content.substr(0,1)=="\n"){
+		content = content.substr(1)
+		openingnewline = "\n"
+	}
+	return openingnewline+'\r<blockquote>\r' + content + '\r</blockquote>\r';
 }
 
 function addDotPoints(savvyCode){

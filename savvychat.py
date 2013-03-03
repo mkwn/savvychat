@@ -55,6 +55,8 @@ class Post(db.Model):
 	author = db.StringProperty()
 	content = db.TextProperty()#if i use string, there's a 500 character limit
 	recipients = db.StringListProperty()#for call
+	pendingemails = db.ListProperty(bool)
+	pendingemailsq = db.BooleanProperty(default=False)
 	date = db.DateTimeProperty(auto_now_add=True)
 
 class Chatuser(db.Model):
@@ -103,49 +105,18 @@ def delToken(chatuser, idx):
 		del chatuser.tokens[idx]
 	except IndexError: pass
 
-def broadcast(post):
+def broadcast(post,dontSave=False):
 	#send a message to everyone who is online
 	tokens = fetchTokens()
-	message = simplejson.dumps(makePostObject(post))
+	message = simplejson.dumps(makePostObject(post,dontSave))
 	for token in tokens:
 		channel.send_message(token, message)
 
-def decompressHTML(html):
-	workhtml = html
-	pairs=[("b>","</b>"),
-		("<b","<b>"),		
-		("i>","</i>"),
-		("<i","<i>"),
-		("<s",'<span style="text-decoration:line-through;">'),
-		("s>","</span>"),
-		("<q",'<blockquote style="border:solid;border-left:none;border-right:none;border-width: 1px;">'),
-		("q>","</blockquote>"),
-		("<t","<div>Highlight below to show "),
-		("t>",":</div>"),
-		("<p",'<blockquote style="background-color:white;color:white;">'),
-		("p>","</blockquote>"),
-		("<l","<li>"),
-		("l>","</li>"),
-		("<u","<ul>"),
-		("u>","</ul>"),
-		("<c",'<span style="font-family:Courier New,monospace;background-color:#EEE;">'),
-		("c>","</span>"),
-		("<x",'<pre style="font-family:Courier New,monospace;background-color:#EEE;">'),
-		("x>","</pre>"),
-		("<a",'<a href="'),
-		("<>",'">'),
-		("a>","</a>"),
-		("<m",'<span style="font-family:Courier New,monospace;">'),
-		("m>","</span>"),
-		("<z",'<div style="font-family:Courier New,monospace;text-align:center;">'),
-		("z>","</div>"),
-		("<r","<br>")]
-	for p in pairs:
-		workhtml = workhtml.replace(p[0],p[1])
-	return workhtml
-
 def sendMail(to, subject, body, html=None, senderName='SavvyChat Mailer', senderMail='mailer'):
 	netloc = getNetloc()
+	if not netloc:
+		doPost("not configured to send emails!","SavvyChat",dontSave=True)
+		return
 	netlocData = netloc.split('.')
 	if len(netlocData) > 2 and netlocData[-2]=="appspot":
 		hostname = netlocData[-3]
@@ -157,35 +128,33 @@ def sendMail(to, subject, body, html=None, senderName='SavvyChat Mailer', sender
 			params["html"] = html
 		mail.send_mail(**params)
 		
-def call(recipients=[], author="a user", plaincontent="", htmlcontent=""):
-	if recipients == []:
+def call(post,force=False):
+	if len(post.recipients) == 0:
 		return
 	#send out emails
+	plaincontent = htmlcontent = post.content
 	TOarray = []
-	if recipients == ["all"]:
-		#call all
-		chatusers = db.GqlQuery("SELECT * FROM Chatuser")
-		for chatuser in chatusers:
-			if chatuser.name.lower() != author.lower() and len(chatuser.tokens) == 0:
+	for recipient in post.recipients:
+		chatuser = getUserFromName(recipient.title())
+		if chatuser and (force or len(chatuser.tokens)==0):
+			idx = post.recipients.index(chatuser.name.lower())
+			if post.pendingemails[idx]:
 				TOarray = TOarray + [chatuser.name + ' <' + chatuser.email + '>']
-		pass
-	else:
-		for recipient in recipients:
-			chatuser = getUserFromName(recipient.title())
-			if chatuser:
-				TOarray = TOarray + [chatuser.name + ' <' + chatuser.email + '>']
-	if TOarray == []:
-		return
-	sendMail(to=', '.join(TOarray),
-		subject="You have been called by "+author+" with SavvyChat",
-		body=plaincontent,
-		html=htmlcontent)
+				post.pendingemails[idx]=False
+	adjustPendingEmails(post)
+	post.put()
+	if TOarray != []:
+		sendMail(to=', '.join(TOarray),
+			subject=post.author+"sent you a message with SavvyChat",
+			body=plaincontent,
+			html=htmlcontent)
 
 def removeWhitespace(data):
 	return ''.join(data.split())
 		
 def resolveStragglers():
 	lastFlush = Global.get("lastFlush")
+	if not lastFlush: lastFlush = "1"
 	lastFlushInt = int(lastFlush)
 	nowInt = int(time.mktime(datetime.utcnow().timetuple()))
 	if nowInt-lastFlushInt < 60*60:
@@ -193,7 +162,7 @@ def resolveStragglers():
 	#if a computer crashes, they will not be able to send the onClose message
 	#look for users with no updates in 2 hours and close them
 	chatusers = db.GqlQuery("SELECT * FROM Chatuser")
-	now = datetime.now()
+	now = datetime.utcnow()
 
 	for chatuser in chatusers:
 		expired = False
@@ -206,6 +175,13 @@ def resolveStragglers():
 			chatuser.put()
 
 	Global.set("lastFlush", str(nowInt))
+
+def resolvePendingEmails():
+	pendingposts = db.GqlQuery("SELECT * FROM Post WHERE pendingemailsq=TRUE")
+	for post in pendingposts:
+		if (datetime.now()-post.date).seconds > 60:
+			call(post,True)
+	pass
 
 def getLastDump():
 	try:
@@ -243,14 +219,16 @@ def getUserFromId(id):
 def getUserFromName(name):
 	return db.GqlQuery("SELECT * FROM Chatuser WHERE name='"+name+"'").get()
 	
-def makePostObject(post):
+def makePostObject(post,dontSave=False):
+	if dontSave: id="dontSave"
+	else:id=post.key().id()
 	#convert instance of post class to object ready for JSON
 	author = getUserFromId(post.author)
 	if not author:
 		author = post.author
 	else:
 		author = author.name
-	return {"content":post.content,"author":author,"date":str(time.mktime(post.date.timetuple())),"recipients":post.recipients,"id":post.key().id()}
+	return {"content":post.content,"author":author,"date":str(time.mktime(post.date.timetuple())),"recipients":post.recipients,"id":id}
 
 def doPost(content, author=None, dontSave=False, recipients=""):
 	if not author:
@@ -266,17 +244,16 @@ def doPost(content, author=None, dontSave=False, recipients=""):
 	post.content = content
 	if recipients == "": post.recipients = []
 	else: post.recipients = recipients.split(",")
-	if dontSave:
-		post.date = datetime.now()
-	else:
+	if not dontSave:
+		post.pendingemails = [True]*len(post.recipients)
+		call(post)
 		post.put()
-	broadcast(post)
+	broadcast(post,dontSave)
 	if not author:
 		authoruser.lastonline = datetime.utcnow()
 		authoruser.put()
-	if len(recipients)>0:
-		call(post.recipients,authoruser.name,content,content)
-	return post.key().id() #id for the post
+	if not dontSave:
+		return post.key().id() #id for the post
 
 def declareUpdate(self):
 	lastDate = datetime.utcnow().date()
@@ -383,6 +360,8 @@ def makeAliaslist(onlyChatusers=False,ignoreUser=None):
 			meaning = alias.meaning
 		if meaning != "":
 			aliases += [alias.aliastext+" "+meaning]
+	if onlyChatusers:
+		aliases += ["all "+",".join(chatuserList)]
 	return '\n'.join(aliases)
 
 def modifyAliases(self):
@@ -406,7 +385,7 @@ def modifyAliases(self):
 	return self.response.out.write(makeAliaslist())
 
 def initNetloc(self):
-        return Global.set("netloc", urlparse.urlsplit(self.request.url)[1])
+	return Global.set("netloc", urlparse.urlsplit(self.request.url)[1])
 
 def getNetloc(self=None):
 	netloc = Global.get("netloc")
@@ -420,7 +399,20 @@ class PostPage(webapp.RequestHandler):
 		recipients = self.request.get('r')
 		if not recipients: recipients = ""
 		self.response.out.write(str(doPost(self.request.get('p'),recipients=recipients)))
-			
+
+class callAckPage(webapp.RequestHandler):
+	def post(self):
+		user = users.get_current_user()
+		if not user:
+			return
+		post = Post.get_by_id(int(self.request.get('id')))
+		post.pendingemails[post.recipients.index(getUserFromId(user.user_id()).name.lower())] = False
+		adjustPendingEmails(post)
+		post.put()
+
+def adjustPendingEmails(post):
+	post.pendingemailsq = True in post.pendingemails
+		
 class RetrievePage(webapp.RequestHandler):
 	#there is a request for more of the post archive
 	def post(self):
@@ -471,7 +463,28 @@ class PingPage(webapp.RequestHandler):
 		token = self.request.get('t')
 		if token:
 			channel.send_message(token, simplejson.dumps({"ping":"ping"}))
-			return self.response.out.write("ping") #for abort logic
+			return self.response.out.write("ping")
+
+class HeartbeatPage(webapp.RequestHandler):
+	def post(self):
+		user = users.get_current_user()
+		if not user:
+			self.response.out.write("autherror")
+			return
+		userid = user.user_id()
+		chatuser = getUserFromId(userid)
+		chatuser.lastonline = datetime.utcnow()
+
+		token = self.request.get('t')
+
+		#gotta do this stuff somewhere
+		resolvePendingEmails()
+		resolveStragglers()
+		checkDump()
+
+		if token:
+			channel.send_message(token, simplejson.dumps({"heartbeat":"heartbeat"}))
+			return self.response.out.write("heartbeat")
 		
 class TokenPage(webapp.RequestHandler):
 	#this creates a new token, for when an old one expires
@@ -507,7 +520,6 @@ class TokenPage(webapp.RequestHandler):
 		#save changes to db
 		chatuser.tokens = chatuser.tokens + [tokenid]
 		chatuser.lastrefreshlist = chatuser.lastrefreshlist + [datetime.utcnow()]
-		chatuser.lastonline = datetime.utcnow()
 		chatuser.put()
 		
 		#serve token
@@ -524,12 +536,9 @@ class disconnectPage(webapp.RequestHandler):
 				delToken(chatuser, tokenindex)
 				break
 			except ValueError: pass
-		if self.request.get('ne'):
-			#we didn't error out, this user has seen all messages
-			chatuser.lastonline = datetime.utcnow()
-		chatuser.put()
 
 		#gotta do this stuff somewhere
+		resolvePendingEmails()
 		resolveStragglers()
 		checkDump()
 		
@@ -753,13 +762,13 @@ class UploadPage(webapp.RequestHandler):
 		try:
 			file.put()
 		except:
-			doPost("File upload failed","SavvyChat",dontSend=True)
+			doPost("File upload failed","SavvyChat",dontSave=True)
 			return
 		path = "download/"+str(file.key().id()) + "/" + filename
 		fullpath = "http://" + self.request.host + "/" + path
 		post = "[[" + fullpath+ "]]"
-		if file.type.find("image") != -1:
-			post = "|img|" + fullpath
+		#if file.type.find("image") != -1:
+		#	post = "|img|" + fullpath
 		doPost(post)
 		self.response.out.write(path)
 		#self.response.headers['Content-Type'] = file.type
@@ -787,9 +796,11 @@ class HelpPage(webapp.RequestHandler):
 application = webapp.WSGIApplication([
 									('/', MainPage),
 									('/post', PostPage),
+									('/callack', callAckPage),
 									('/retrieve', RetrievePage),
 									('/sync', SyncPage),
 									('/ping', PingPage),
+									('/heartbeat', HeartbeatPage),
 									('/_ah/channel/disconnected/', disconnectPage),
 									('/options', OptionsPage),
 									('/token', TokenPage),
