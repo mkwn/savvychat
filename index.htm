@@ -1490,7 +1490,7 @@ function onLoadBody(){
 
 	MJQT("dummy");//hack to fix a mathjax bug
 
-	var aliasesData=$("#aliaslist").text().split("\n");
+	var aliasesData=$("#aliaslist").text().toLowerCase().split("\n");
 	for(var alias in aliasesData){
 		aliasData = aliasesData[alias].split(" ");
 		aliases.push({aliastext:aliasData[0],meaning:aliasData[1]});

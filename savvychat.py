@@ -791,7 +791,10 @@ class GadgetXMLPage(webapp.RequestHandler):
 
 class HelpPage(webapp.RequestHandler):
 	def get(self):
-		return self.response.out.write(template.render('help.htm', {'netloc':getNetloc(self)}))
+		return self.response.out.write(template.render('help.htm', {
+			'netloc':getNetloc(self),
+			'aliaslist': makeAliaslist(True)
+		}))
 		
 application = webapp.WSGIApplication([
 									('/', MainPage),
