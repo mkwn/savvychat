@@ -535,7 +535,6 @@ function sendPost(){
 	};
 
 	getHTMLfromSavvyCode(text,false,true); // get recipients
-	console.log(recipients)
 	sendMessage('/post', {p:text,r:recipients.join(",")}, callback, abort)
 
 	document.getElementById("preview").innerHTML = "";
@@ -732,7 +731,6 @@ function hashstuff(text,codehash,mathhash,linkhashname,linkhashurl){
 				linkdata.unshift(linkdata[0]);
 			}
 			linkdata[1] = addHTTPtoURL(linkdata[1]);
-			console.log(linkdata[1])
 			linkhashurl.push(linkdata[1].replace(/\s/g,""));
 			linkhashname.push(linkdata[0]);
 			worktext = linkparts.join("]]");
@@ -846,7 +844,6 @@ function receivePost(post,prepend,notification){
 
 	var authortext = post.author+": "
 	if(post.recipients.length>0){
-		console.log(post.recipients)
 		authortext = post.author+" to "+makeRecipientsText(post.recipients)+": ";
 	}
 
@@ -1070,16 +1067,15 @@ function getHTMLfromSavvyCode(savvyCode, domath, handleRecipients){
 	var softLinkNameHash = [];
 	var softLinkHash = [];
 	output = output.replace(urlRegEx, function(){
-		link = RegExp.$1;
-		link = addHTTPtoURL(link)
-		softLinkHash.push(link);
-		softLinkNameHash.push(RegExp.$1);
+		URL = RegExp.$1;
+		softLinkHash.push(addHTTPtoURL(URL));
+		softLinkNameHash.push(URL);
 		return "~S";
 	});
 	
 	if(handleRecipients){
-		output = output.replace(/@(\w+)/ig, function(){
-			var user = RegExp.$1.toLowerCase();
+		output = output.replace(/@(\w+)/ig, function(string) {
+			var user = string.substr(1).toLowerCase();
 			var highlight = false;
 			for(var alias in aliases){
 				if(aliases[alias].aliastext == user){
@@ -1088,8 +1084,8 @@ function getHTMLfromSavvyCode(savvyCode, domath, handleRecipients){
 					break;
 				}
 			}
-			if(highlight) return '<span class="user">@'+RegExp.$1+"</span>";
-			return '@'+RegExp.$1;
+			if(highlight) return '<span class="user">'+string+"</span>";
+			return string;
 		});
 	}
 
@@ -1164,7 +1160,6 @@ function getHTMLfromSavvyCode(savvyCode, domath, handleRecipients){
 
 //recursive helper function that uses an undocumented feature of replace() to parse nested ">" quote tags
 function addQuotes(savvyCode){
-	console.log(savvyCode.replace(/\\r/g,"\\r"))
 	var content = savvyCode.replace(/([\n\r])&gt;/g,"$1")/*.replace(/^\n|\n$/g,'')*/.replace(/([\r\n]&gt;.*?)+[\r\n]/g,function(savvyCode){return addQuotes(savvyCode);})+"\r";
 	if(content.replace(/\r/g,"") == ""){
 		content = "<br /"+">";
