@@ -1138,7 +1138,7 @@ function getHTMLfromSavvyCode(savvyCode, domath, handleRecipients){
 	output = output
 		.replace(/^(\r*)~A1img~A2/,'\n$1~A1img~A2')
 		.replace(/~A1img~A2/g,'<a target="_blank" href="~U"><img onerror="'+imgonload+'" onload="'+imgonload+'" src="[[" /'+'></a>')
-		.replace(/~A1(.*)~A2/g,'<a target="_blank" href="[[">$1</a>');
+		.replace(/~A1(.*?)~A2/g,'<a target="_blank" href="[[">$1</a>');
 	linkparts = output.split("[[");
 	output = interleave(linkparts,linkhashurl,atags[0],atags[1],atags[0],atags[1])
 		.replace(/~I/g,"img")
@@ -1186,11 +1186,12 @@ function addDotPoints(savvyCode){
 //helper function that puts a hash back into the text
 //has is tagged according to whether the code/math is isolated in a paragraph
 function interleave(parts, hash, startSepLine, endSepLine, startSepBlock, endSepBlock){
-
 	var progress = "";
 	while(hash.length > 0){
 		progress += parts.shift();
-		if(/[\r\n]/.test(progress.charAt(progress.length-1)) && /[\r\n]/.test(parts[0].charAt(0))){
+		if(progress.length>0 && parts.length>0 && parts[0].length>0
+			&&/[\r\n]/.test(progress.charAt(progress.length-1))
+			&& /[\r\n]/.test(parts[0].charAt(0))){
 			progress += startSepBlock+hash.shift() + endSepBlock;
 		}else{
 			progress += startSepLine+hash.shift() + endSepLine;

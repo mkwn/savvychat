@@ -145,7 +145,7 @@ def call(post,force=False):
 	post.put()
 	if TOarray != []:
 		sendMail(to=', '.join(TOarray),
-			subject=post.author+"sent you a message with SavvyChat",
+			subject=getUserFromId(post.author).name+" sent you a message with SavvyChat",
 			body=plaincontent,
 			html=htmlcontent)
 
@@ -534,6 +534,7 @@ class disconnectPage(webapp.RequestHandler):
 			try:
 				tokenindex = chatuser.tokens.index(tokenid)
 				delToken(chatuser, tokenindex)
+				chatuser.put()
 				break
 			except ValueError: pass
 
