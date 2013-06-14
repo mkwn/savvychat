@@ -261,7 +261,7 @@ function onClose(){
 	}
 	clearTimeout(checkConnectionTimeout);
 	if(connectionError || authError) return;
-	displayNote("Communication channel closed. SavvyChat is attempting to refresh your connection. If this doesn't work, please [[reload the page@@javascript:closeMessage();location.reload();]].");
+	displayNote("Communication channel closed. SavvyChat is attempting to refresh your connection. If this takes longer than about 10 seconds, you should probably [[reload the page@@javascript:closeMessage();location.reload();]].");
 	refreshToken(1);
 }
 
@@ -269,7 +269,7 @@ var suppressChannelFail = false;
 function channelFail(){
 	if(suppressChannelFail) return;
 	if(connectionError || authError) return;
-	displayNote("SavvyChat's communication channel seems slow, flaky or broken. Maybe you want to [[refresh the channel connection@@javascript:onClose();]] or [[reload the page@@javascript:closeMessage();location.reload();]]. Click [[here@@javascript:suppressChannelFail=true;]] to make these warnings stop happening.");
+	displayNote("SavvyChat's communication channel seems slow or flaky. You can use the command `/sync` to manually check for missed messages. Maybe you want to [[refresh the channel connection@@javascript:onClose();]] or [[reload the page@@javascript:closeMessage();location.reload();]]. Click [[here@@javascript:suppressChannelFail=true;]] to make these warnings stop happening.");
 	clearTimeout(checkConnectionTimeout)
 	checkConnectionTimeout = setTimeout("heartbeat();",connectionCheckInterval);
 }
@@ -281,7 +281,7 @@ function ajaxFail(request){
 	if(connectionError || authError) return;
 	var requestText = '';
 	if(request) requestText = ' (`'+request+'`)';
-	displayNote("Some request"+requestText+" failed or timed out. Maybe you want to [[refresh the channel connection@@javascript:onClose();]] or [[reload the page@@javascript:closeMessage();location.reload();]]. Click [[here@@javascript:suppressAjaxFail=true;]] to make these warnings stop happening.");
+	displayNote("Some request"+requestText+" failed or timed out. Maybe you want to [[reload the page@@javascript:closeMessage();location.reload();]]. Click [[here@@javascript:suppressAjaxFail=true;]] to make these warnings stop happening.");
 	onClose();
 }
 
