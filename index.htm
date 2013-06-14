@@ -730,8 +730,10 @@ function hashstuff(text,codehash,mathhash,linkhashname,linkhashurl){
 				if(linkdata[0]=="img") linkdata[0] = "~I";
 				linkdata.unshift(linkdata[0]);
 			}
-			linkdata[1] = addHTTPtoURL(linkdata[1]);
-			linkhashurl.push(linkdata[1].replace(/\s/g,""));
+			linkdata[1] = addHTTPtoURL(linkdata[1])
+				.replace(/\s/g,"")
+				.replace(/^javascript:(|.*[^;]);*$/,"\" onclick=\"$1;return false;");
+			linkhashurl.push(linkdata[1]);
 			linkhashname.push(linkdata[0]);
 			worktext = linkparts.join("]]");
 		}else if(mathparts[0].length == firstIndex){
@@ -1484,6 +1486,11 @@ function unmarquee(){
 function onLoadBody(){
 	//this is the stuff we want to call after all the page has been loaded
 
+	//http://stackoverflow.com/questions/829046/how-do-i-detect-if-a-user-has-got-to-a-page-using-the-back-button
+	var dirtypage = false;
+	if (document.getElementById('page_is_dirty').value == '1') dirtypage = true;
+	document.getElementById('page_is_dirty').value = '1';
+
 	MJQT("dummy");//hack to fix a mathjax bug
 
 	var aliasesData=$("#aliaslist").text().toLowerCase().split("\n");
@@ -1575,7 +1582,11 @@ function onLoadBody(){
 	
 	setIcon("favicon.ico");//maybe this should be *before* page load...
 	
-	openChannel();
+	if(dirtypage){
+		socket = {close:function(){}};
+		onClose(true);
+	}
+	else openChannel();
 }
 
 function onBlur (){
@@ -1672,6 +1683,10 @@ function goToView(dest) {
 <!--The following is a dummy div where all the initial posts can be dumped while escaping unicode etc-->
 <pre id="initialposts" style="display:none;">{% for post in posts %}<pre><pre>{{ post.author }}</pre><pre>{{ post.content|escape }}</pre><pre>{{ post.date }}</pre>{% for recipient in post.recipients %}<pre>{{ recipient }}</pre>{% endfor %}</pre>{% endfor %}</pre>
 <pre id="aliaslist" style="display:none;">{{ aliaslist|escape }}</pre>
+
+<form name="ignore_me">
+    <input type="hidden" id="page_is_dirty" name="page_is_dirty" value="0" />
+</form>
 
 </body>
 </html>
