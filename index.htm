@@ -64,6 +64,9 @@ var channelWaitLeniency = 10*1000;
 $.ajaxSetup({timeout:10*1000});
 var connectionCheckInterval = 60*1000;
 
+//http://daringfireball.net/2010/07/improved_regex_for_matching_urls
+var urlRegEx = /\b((?:https?:\/\/|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}\/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:'".,<>?«»“”‘’]))/ig;
+
 //http://stackoverflow.com/questions/3629817/getting-a-union-of-two-arrays-in-javascript
 jQuery.fn.extend({
     union: function(array1, array2) {
@@ -698,7 +701,7 @@ function validateFile(){
 }
 
 //helper function since we require to hash the 3 different escaping tags in both autoquote() and getHTMLfromSavvyCode()
-function hashstuff(text,codehash,mathhash,linkhashname,linkhashurl){
+function hashstuff(text,codehash,mathhash,linkhashname,linkhashurl,tweakJSlinks){
 	var worktext = text.replace(/``/g,"$\r$").replace(/`/g,"``").replace(/\$\r\$/g,"\r`\r");//double backtick escapes
 	var output = "";
 	while(1){
@@ -730,9 +733,10 @@ function hashstuff(text,codehash,mathhash,linkhashname,linkhashurl){
 				if(linkdata[0]=="img") linkdata[0] = "~I";
 				linkdata.unshift(linkdata[0]);
 			}
-			linkdata[1] = addHTTPtoURL(linkdata[1])
-				.replace(/\s/g,"")
-				.replace(/^javascript:(|.*[^;]);*$/,"\" onclick=\"$1;return false;");
+			linkdata[1] = addHTTPtoURL(linkdata[1]);
+			if(tweakJSlinks)
+				linkdata[1] = linkdata[1].replace(/\n/g,"")
+					.replace(/^javascript:(|.*[^;]);*$/,"\" onclick=\"$1;return false;");
 			linkhashurl.push(linkdata[1]);
 			linkhashname.push(linkdata[0]);
 			worktext = linkparts.join("]]");
@@ -746,14 +750,8 @@ function hashstuff(text,codehash,mathhash,linkhashname,linkhashurl){
 }
 
 function formatQuote(content){
-	var worktext = content.replace(/^\|\|[\s\S]*?\|\|/,"").replace(/\r/g,"");
-	
-	//find something formatted like a link
-	worktext = "\r" + worktext + "\r";
-	worktext = worktext.replace(/(\s(&gt;)*)((ht|f)tp(s?)\:\/\/[\S]*)(\s)/g,"$1[[$3]]$6");
-	worktext = worktext.replace(/(\s(&gt;)*)((ht|f)tp(s?)\:\/\/[\S]*)(\s)/g,"$1[[$3]]$6");
-	//(two passes to remove adjacent links)
-	
+	var worktext = content.replace(/\r/g,"").replace(/~/g,"~T");
+
 	//hash code and math
 	var codehash = [];
 	var mathhash = [];
@@ -761,6 +759,12 @@ function formatQuote(content){
 	var linkhashurl = [];
 	
 	var output = hashstuff(worktext,codehash,mathhash,linkhashname,linkhashurl)
+
+	var softLinkHash = [];
+	output = output.replace(urlRegEx, function(){
+		softLinkHash.push(RegExp.$1);
+		return "~S";
+	});
 
 	//put back escaped backticks
 	output = output.replace(/`\/\/\/\//g,"`\r`\r");
@@ -772,24 +776,27 @@ function formatQuote(content){
 	output = output.replace(/\/\/([\s\S]*?)$/,'//$1//')
 	output = output.replace(/__([\s\S]*?)$/,'__$1__');
 	
-	//put back code
-	codeparts = output.split("``");
-	output = interleave(codeparts,codehash,'`','`','`','`');
 	//put back text part of links
 	linkparts = output.split("[[");
 	output = interleave(linkparts,linkhashname,'\r[\r[\r','@@[[]]','\r[\r[\r','@@[[]]');
 	//put back links
 	linkparts = output.split("[[");
 	output = interleave(linkparts,linkhashurl,'','','','');	
+	//put back soft links
+	linkparts = output.split("~S");
+	output = interleave(linkparts,softLinkHash,'','','','');
 	
 	//simplify link format
 	output = output.replace(/\[\r\[\r(.*?)@@\1\]\]/g,"[[$1]]");
 	
+	//put back code
+	codeparts = output.split("``");
+	output = interleave(codeparts,codehash,'`','`','`','`');
 	//put back math
 	mathparts = output.split("$$");
 	output = interleave(mathparts, mathhash,'$$','$$','$$',' $$');
 	var textarea = document.getElementById("composefield");
-	return output.replace(/\r/g,'');
+	return output.replace(/\r/g,'').replace(/~T/g,"~");
 }
 
 //append the textbox with a quote of another post
@@ -1045,7 +1052,6 @@ function getHTMLfromSavvyCode(savvyCode, domath, handleRecipients){
 	}
 	//escape stuff. ~ is my escape character.
 	var worktext = savvyCode
-		.replace(/\r\n/g,"\n")
 		.replace(/\r/g,"")
 		.replace(/&/g,"&amp;")
 		.replace(/</g,"&lt;")
@@ -1062,18 +1068,27 @@ function getHTMLfromSavvyCode(savvyCode, domath, handleRecipients){
 	var mathhash = [];
 	var linkhashname = [];
 	var linkhashurl = [];
-	var output = hashstuff(worktext,codehash,mathhash,linkhashname,linkhashurl)
-
-	//http://daringfireball.net/2010/07/improved_regex_for_matching_urls
-	var urlRegEx = /\b((?:https?:\/\/|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}\/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:'".,<>?«»“”‘’]))/ig;
+	var output = hashstuff(worktext,codehash,mathhash,linkhashname,linkhashurl,true)
+	
+	output = output
+		.replace(/&lt;/g,"<")
+		.replace(/&gt;/g,">")
+		.replace(/&amp;/g,"&");
 	var softLinkNameHash = [];
 	var softLinkHash = [];
 	output = output.replace(urlRegEx, function(){
-		URL = RegExp.$1;
+		URL = RegExp.$1
+			.replace(/&/g,"&amp;")
+			.replace(/</g,"&lt;")
+			.replace(/\>/g,"&gt;");
 		softLinkHash.push(addHTTPtoURL(URL));
 		softLinkNameHash.push(URL);
 		return "~S";
 	});
+	output = output
+		.replace(/&/g,"&amp;")
+		.replace(/</g,"&lt;")
+		.replace(/\>/g,"&gt;");
 	
 	if(handleRecipients){
 		output = output.replace(/@(\w+)/ig, function(string) {
@@ -1138,15 +1153,15 @@ function getHTMLfromSavvyCode(savvyCode, domath, handleRecipients){
 	output = interleave(linkparts,linkhashname,atags[0],atags[1],atags[0],atags[1]);
 	var imgonload = "setTimeout(&quot;scrollDown();&quot;,1);"
 	output = output
-		.replace(/^(\r*)~A1img~A2/,'\n$1~A1img~A2')
+		.replace(/^(\r*)~A1img~A2/g,'\n$1~A1img~A2')
 		.replace(/~A1img~A2/g,'<a target="_blank" href="~U"><img onerror="'+imgonload+'" onload="'+imgonload+'" src="[[" /'+'></a>')
-		.replace(/~A1(.*?)~A2/g,'<a target="_blank" href="[[">$1</a>');
+		.replace(/~A1([\s\S]*?)~A2/g,'<a target="_blank" href="[[">$1</a>');
 	linkparts = output.split("[[");
 	output = interleave(linkparts,linkhashurl,atags[0],atags[1],atags[0],atags[1])
 		.replace(/~I/g,"img")
-		.replace(/~U(.*)~A1(.*)~A2/g,"$2$1$2")
+		.replace(/~U(.*)~A1([\s\S]*?)~A2/g,"$2$1$2")
 		.replace(/~A1|~A2/g,"");
-	
+
 	//put back math
 	if(multiline) output = "\r" + output + "\r";
 	mathparts = output.split("$$");

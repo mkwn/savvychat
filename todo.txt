@@ -1,3 +1,9 @@
+NEW STUFF
+admin exec()
+mute and math should save
+include js files
+python savvycode, change how call works
+
 PRIORITY 0: DEFECTS
 fixed width font for dumps
 allow only 1 token per user

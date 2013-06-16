@@ -17,9 +17,6 @@ handlers:
   static_files: jquery-1.9.1.min.js
   upload: jquery-1.9.1.min.js
 
-- url: /fixScroll
-  static_dir: fixScroll
-
 - url: /sounds
   static_dir: sounds
   
