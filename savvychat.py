@@ -500,14 +500,6 @@ class TokenPage(webapp.RequestHandler):
 			self.response.out.write("autherror")
 			return
 
-		#next, remove old token in db
-		try:
-			tokenindex = chatuser.tokens.index(self.request.get('t'))
-			delToken(chatuser, tokenindex)
-		except ValueError:
-			#token has been removed already
-			pass
-
 		#get new token
 		suffix = 0
 		while 1:
