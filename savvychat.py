@@ -13,7 +13,7 @@ from django.utils import simplejson
 from datetime import datetime
 import time
 
-from random import choice
+from random import choice, randint
 
 from sets import Set
 
@@ -25,12 +25,17 @@ import re
 import traceback
 
 MAXPOSTS = 30 #max number of posts initialized
-#EXTRAPOSTS = 30 #number of posts received when "view older" is checked.
+EXTRAPOSTS = 20 #number of posts received when "view older" is checked (should be < MAXPOSTS)
+TOKENRECYCLEAGE = 2*60*60-5*60 #if a token is older than this, we won't give it to a new user (2 hours is token lifetime, then minus 5 mins).
+TOKENREMOVEAGE = 2*60*60+5*60 #if a token is older than this, we'll consider it dead.
+HOUSEKEEPINGINTERVAL = 5*60
+AUTODUMPINTERVAL = 24*60*60
 
 #http://stackoverflow.com/questions/2350454/simplest-way-to-store-a-value-in-google-app-engine-python
 class Global(db.Model):
 	#store miscellaneous strings
 	value = db.StringProperty()
+	values = db.StringListProperty()
 
 	@classmethod
 	def get(cls, key):
@@ -38,7 +43,7 @@ class Global(db.Model):
 		if not value:
 			instance = cls.get_by_key_name(key)
 			if instance:
-				value = instance.value
+				value = instance.value or instance.values
 				memcache.set(key=key, value=value)
 			else:
 				return None
@@ -47,8 +52,17 @@ class Global(db.Model):
 	@classmethod
 	def set(cls, key, value):
 		memcache.set(key=key, value=value)
-		entity = cls(key_name=key, value=value).put()
+		entity = cls(key_name=key)
+		if type(value) is list: entity.values = value
+		else: entity.value = value
+		entity.put()
 		return value
+
+class Chatchannel(db.Model):
+	#store miscellaneous strings
+	birthday = db.DateTimeProperty(auto_now_add=True)
+	token = db.StringProperty()
+	owner = db.StringProperty()
 
 class Post(db.Model):
 	#each post stored in the DB is of this class
@@ -64,8 +78,6 @@ class Chatuser(db.Model):
 	userid = db.StringProperty()
 	name = db.StringProperty()
 	email = db.EmailProperty()
-	tokens = db.StringListProperty()
-	lastrefreshlist = db.ListProperty(datetime)
 	playtone = db.BooleanProperty(default=False)
 	shiftsend = db.BooleanProperty(default=True)
 	hf = db.BooleanProperty(default=True)
@@ -88,14 +100,42 @@ class Alias(db.Model):
 	aliastext = db.StringProperty()
 	meaning = db.StringProperty()
 
+def getFreeChannel(userid):
+	tokenids = fetchTokens()
+	tokenswriteflag = False #did we make changes
+	chatchannel = None
+	for tokenid in tokenids:
+		chatchannel = Chatchannel.get_by_key_name(tokenid)
+		age = TOKENREMOVEAGE+1
+		if chatchannel:
+			age = (datetime.now()-chatchannel.birthday).seconds
+		if age < TOKENRECYCLEAGE and not chatchannel.owner:
+			chatchannel.owner = userid
+			chatchannel.put()
+			break
+		if age > TOKENREMOVEAGE or not chatchannel.owner:
+			if chatchannel: chatchannel.delete()
+			tokenids = tokenids[1:]
+			tokenswriteflag = True
+		chatchannel = None
+	if not chatchannel:
+		chatchannel = createChannel(userid,tokenids)
+		tokenswriteflag = True
+	if tokenswriteflag: Global.set("tokens", tokenids)
+	return chatchannel
+
+def createChannel(userid,tokenids):
+	tokenid = randint(0,50)
+	while tokenid in tokenids: tokenid += 1
+	chatchannel = Chatchannel(key_name=str(tokenid))
+	chatchannel.token = channel.create_channel(str(tokenid))
+	chatchannel.owner = userid
+	chatchannel.put()
+	tokenids += [str(tokenid)]
+	return chatchannel
+
 def fetchTokens():
-	#if not tokens:
-	
-	tokens = []	
-	chatusers = db.GqlQuery("SELECT * FROM Chatuser WHERE tokens!=NULL")
-	for chatuser in chatusers:
-		tokens = tokens + chatuser.tokens
-	return tokens
+	return Global.get("tokens") or []
 
 def delToken(chatuser, idx):
 	try:
@@ -128,6 +168,9 @@ def sendMail(to, subject, body, html=None, senderName='SavvyChat Mailer', sender
 			params["html"] = html
 		mail.send_mail(**params)
 		
+def adjustPendingEmails(post):
+	post.pendingemailsq = True in post.pendingemails
+
 def call(post,force=False):
 	if len(post.recipients) == 0:
 		return
@@ -136,7 +179,7 @@ def call(post,force=False):
 	TOarray = []
 	for recipient in post.recipients:
 		chatuser = getUserFromName(recipient.title())
-		if chatuser and (force or len(chatuser.tokens)==0):
+		if chatuser and (force or userOnline(chatuser.userid)):
 			idx = post.recipients.index(chatuser.name.lower())
 			if post.pendingemails[idx]:
 				TOarray = TOarray + [chatuser.name + ' <' + chatuser.email + '>']
@@ -152,35 +195,24 @@ def call(post,force=False):
 def removeWhitespace(data):
 	return ''.join(data.split())
 		
-def resolveStragglers():
-	lastFlush = Global.get("lastFlush")
-	if not lastFlush: lastFlush = "1"
-	lastFlushInt = int(lastFlush)
-	nowInt = int(time.mktime(datetime.utcnow().timetuple()))
-	if nowInt-lastFlushInt < 60*60:
+def housekeeping():
+	lastHK = Global.get("lastHK")
+	if not lastHK: lastHK = "1"
+	lastHKInt = int(lastHK)
+	nowInt = int(time.mktime(datetime.now().timetuple()))
+	if nowInt-lastHKInt < HOUSEKEEPINGINTERVAL:
 		return
-	#if a computer crashes, they will not be able to send the onClose message
-	#look for users with no updates in 2 hours and close them
-	chatusers = db.GqlQuery("SELECT * FROM Chatuser")
-	now = datetime.utcnow()
 
-	for chatuser in chatusers:
-		expired = False
-		for idx, lastrefresh in enumerate(chatuser.lastrefreshlist):
-			if (now-lastrefresh).seconds > 60*60*2+120:
-				#expired
-				delToken(chatuser, idx)
-				expired = True
-		if expired:
-			chatuser.put()
+	resolvePendingEmails()
+	checkDump()
 
-	Global.set("lastFlush", str(nowInt))
+	Global.set("lastHK", str(nowInt))
 
 def resolvePendingEmails():
 	pendingposts = db.GqlQuery("SELECT * FROM Post WHERE pendingemailsq=TRUE")
 	for post in pendingposts:
-		if (datetime.now()-post.date).seconds > 60:
-			call(post,True)
+		#if (datetime.now()-post.date).seconds > 60:
+		call(post,True)
 	pass
 
 def getLastDump():
@@ -200,8 +232,8 @@ def checkDump():
 	startInt = getLastDump()
 
 	#get end time
-	endInt = int(time.mktime(datetime.utcnow().timetuple()))
-	if endInt-startInt > 24*60*60:
+	endInt = int(time.mktime(datetime.now().timetuple()))
+	if endInt-startInt > AUTODUMPINTERVAL:
 		autoDump = Global.get("autoDump")
 		if not autoDump: autoDump = ""
 		recipients = autoDump.split()
@@ -218,6 +250,23 @@ def getUserFromId(id):
 	
 def getUserFromName(name):
 	return db.GqlQuery("SELECT * FROM Chatuser WHERE name='"+name+"'").get()
+
+def auth(function):
+	def newfunction(self, **kwargs):
+		#first, authenticate:
+		user = users.get_current_user()
+		if not user:
+			return self.response.out.write("autherror")
+		userid = user.user_id()
+		kwargs["userid"] = userid
+		chatuser = getUserFromId(userid)
+		if not chatuser:
+			return self.response.out.write("autherror")
+		return function(self,**kwargs)
+	return newfunction
+
+def userOnline(userid):
+	return not not db.GqlQuery("SELECT * FROM Chatchannel WHERE owner='"+userid+"'").get()
 	
 def makePostObject(post,dontSave=False):
 	if dontSave: id="dontSave"
@@ -230,17 +279,9 @@ def makePostObject(post,dontSave=False):
 		author = author.name
 	return {"content":post.content,"author":author,"date":str(time.mktime(post.date.timetuple())),"recipients":post.recipients,"id":id}
 
-def doPost(content, author=None, dontSave=False, recipients=""):
-	if not author:
-		user = users.get_current_user()
-		if not user:
-			return
-		authoruser = getUserFromId(user.user_id())
-		if not authoruser:
-			return
-		
+def doPost(content, author, dontSave=False, recipients=""):		
 	post = Post()
-	post.author = author or user.user_id()
+	post.author = author
 	post.content = content
 	if recipients == "": post.recipients = []
 	else: post.recipients = recipients.split(",")
@@ -249,14 +290,11 @@ def doPost(content, author=None, dontSave=False, recipients=""):
 		call(post)
 		post.put()
 	broadcast(post,dontSave)
-	if not author:
-		authoruser.lastonline = datetime.utcnow()
-		authoruser.put()
 	if not dontSave:
 		return post.key().id() #id for the post
 
 def declareUpdate(self):
-	lastDate = datetime.utcnow().date()
+	lastDate = datetime.now().date()
 	dateArg = self.request.get('d')
 	if dateArg:
 		lastDate = datetime.fromtimestamp(int(dateArg)).date()
@@ -305,7 +343,7 @@ def manualDump(self):
 		startInt = int(startArg)
 	
 	#get end time
-	endInt = int(time.mktime(datetime.utcnow().timetuple()))
+	endInt = int(time.mktime(datetime.now().timetuple()))
 	endArg = self.request.get('e')
 	if endArg:
 		endInt = int(endArg)
@@ -394,30 +432,30 @@ def getNetloc(self=None):
 	return netloc
 
 class PostPage(webapp.RequestHandler):
-	def post(self):
+	@auth
+	def post(self,**kwargs):
 		#called on recieving a post
 		recipients = self.request.get('r')
 		if not recipients: recipients = ""
-		self.response.out.write(str(doPost(self.request.get('p'),recipients=recipients)))
+		self.response.out.write(str(doPost(
+			self.request.get('p'),
+			kwargs["userid"],
+			recipients=recipients)))
 
 class callAckPage(webapp.RequestHandler):
-	def post(self):
-		user = users.get_current_user()
-		if not user:
-			return
+	@auth
+	def post(self,**kwargs):
 		post = Post.get_by_id(int(self.request.get('id')))
 		post.pendingemails[post.recipients.index(getUserFromId(user.user_id()).name.lower())] = False
 		adjustPendingEmails(post)
 		post.put()
-
-def adjustPendingEmails(post):
-	post.pendingemailsq = True in post.pendingemails
 		
 class RetrievePage(webapp.RequestHandler):
 	#there is a request for more of the post archive
-	def post(self):
+	@auth
+	def post(self,**kwargs):
 		cursor = self.request.get('c')
-		numPosts = 20
+		numPosts = EXTRAPOSTS
 		if self.request.get('n'):
 			numPosts = min(int(self.request.get('n')),MAXPOSTS)
 		postsData = db.GqlQuery("SELECT * FROM Post ORDER BY date DESC").with_cursor(cursor)
@@ -428,17 +466,16 @@ class RetrievePage(webapp.RequestHandler):
 			if len(posts) == numPosts:
 				#we are done
 				showarchive = True
-				break;
+				break
 			posts = posts + [makePostObject(post)]
 			querycursor = postsData.cursor() #but it's inefficient to keep overwriting the cursor...
-		#postList = postsData.fetch(EXTRAPOSTS)
 		message = simplejson.dumps({'posts':posts,'cursor':querycursor,'showarchive':showarchive})
 		self.response.out.write(message)
-		#channel.send_message(self.request.get('t'), message)
 
 class SyncPage(webapp.RequestHandler):
-	#there is a request for a sync since last time
-	def post(self):
+	@auth
+	def post(self,**kwargs):
+		#there is a request for a sync since last time
 		endcursor = self.request.get('c')
 		if endcursor == "":
 			endcursor = None
@@ -456,88 +493,49 @@ class SyncPage(webapp.RequestHandler):
 			posts = posts[:-1]
 		message = simplejson.dumps({'posts':posts,'cursor':startcursor})
 		self.response.out.write(message)
-		#channel.send_message(self.request.get('t'), message)
 
 class PingPage(webapp.RequestHandler):
-	def post(self):
-		token = self.request.get('t')
-		if token:
-			channel.send_message(token, simplejson.dumps({"ping":"ping"}))
+	@auth
+	def post(self,**kwargs):
+		tokenid = self.request.get('t')
+		if tokenid:
+			channel.send_message(tokenid, simplejson.dumps({"ping":"ping"}))
 			return self.response.out.write("ping")
 
 class HeartbeatPage(webapp.RequestHandler):
-	def post(self):
-		user = users.get_current_user()
-		if not user:
-			self.response.out.write("autherror")
-			return
-		userid = user.user_id()
-		chatuser = getUserFromId(userid)
-		chatuser.lastonline = datetime.utcnow()
-
-		token = self.request.get('t')
-
-		#gotta do this stuff somewhere
-		resolvePendingEmails()
-		resolveStragglers()
-		checkDump()
-
-		if token:
-			channel.send_message(token, simplejson.dumps({"heartbeat":"heartbeat"}))
-			return self.response.out.write("heartbeat")
+	def post(self,**kwargs):
+		tokenid = self.request.get('t')
+		if tokenid:
+			channel.send_message(tokenid, simplejson.dumps({"heartbeat":"heartbeat"}))
+			self.response.out.write("heartbeat")
 		
 class TokenPage(webapp.RequestHandler):
-	#this creates a new token, for when an old one expires
-	def post(self):
-		#first, authenticate:
-		user = users.get_current_user()
-		if not user:
-			self.response.out.write("autherror")
-			return
-		userid = user.user_id()
-		chatuser = getUserFromId(userid)
-		if not chatuser:
-			self.response.out.write("autherror")
-			return
-
-		#get new token
-		suffix = 0
-		while 1:
-			if not userid+str(suffix) in chatuser.tokens:
-				tokenid = userid+str(suffix)
-				break
-			suffix = suffix + 1
-		token = channel.create_channel(tokenid)
-		
-		#save changes to db
-		chatuser.tokens = chatuser.tokens + [tokenid]
-		chatuser.lastrefreshlist = chatuser.lastrefreshlist + [datetime.utcnow()]
-		chatuser.put()
-		
+	@auth
+	def post(self,**kwargs):
+		#this creates a new token, for when an old one expires
+		chatchannel = getFreeChannel(kwargs["userid"])
 		#serve token
-		self.response.out.write(tokenid + '@@' + token)
+		self.response.out.write(chatchannel.key().name() + '@@' + chatchannel.token)
 		
 class disconnectPage(webapp.RequestHandler):
-	def post(self):
+	def post(self,**kwargs):
 		tokenid = self.request.get('from')
-		#who knows where it came from
-		chatusers = db.GqlQuery("SELECT * FROM Chatuser")
-		for chatuser in chatusers:
-			try:
-				tokenindex = chatuser.tokens.index(tokenid)
-				delToken(chatuser, tokenindex)
+
+		chatchannel = Chatchannel.get_by_key_name(tokenid)
+		if chatchannel and chatchannel.id:
+			chatuser = getUserFromId(chatchannel.owner)
+			if chatuser:
+				chatuser.lastonline = datetime.now()
 				chatuser.put()
-				break
-			except ValueError: pass
+				chatchannel.owner = None
+				chatchannel.put()
 
 		#gotta do this stuff somewhere
-		resolvePendingEmails()
-		resolveStragglers()
-		checkDump()
+		housekeeping()
 		
 class OptionsPage(webapp.RequestHandler):
-	#for when someone changes some setting
-	def post(self):
+	@auth
+	def post(self,**kwargs):
 		#authenticate
 		user = users.get_current_user()
 		if not user:
@@ -555,11 +553,8 @@ class OptionsPage(webapp.RequestHandler):
 		elif typeString == "shiftsend":
 			chatuser.shiftsend = self.request.get('s') == "true"
 
-		chatuser.lastonline = datetime.utcnow()
-		chatuser.put()
-
 class MainPage(webapp.RequestHandler):
-	def get(self):
+	def get(self,**kwargs):
 		#authenticate
 		user = users.get_current_user()
 		if not user:
@@ -583,7 +578,7 @@ class MainPage(webapp.RequestHandler):
 				chatuser.userid = userid
 				chatuser.name = whiteuser.name
 				chatuser.email = whiteuser.email
-				#chatuser.put()
+				chatuser.put()
 				chatuser.lastonline = datetime(2000,1,1) #so we load every message for them
 			else:
 				#not in whitelist
@@ -616,21 +611,8 @@ class MainPage(webapp.RequestHandler):
 			posts = posts + [makePostObject(post)]
 			endquerycursor = postsData.cursor() #but it's inefficient to keep overwriting the cursor...
 			showarchive = False
-				
-		#make token
-		suffix = 0
-		while 1:
-			if not userid+str(suffix) in chatuser.tokens:
-				tokenid = userid+str(suffix)
-				break
-			suffix = suffix + 1
-		token = channel.create_channel(tokenid)
 		
-		#the following would ideally be in openedpage, but it creates the possibility of duplicate tokens
-		chatuser.tokens = chatuser.tokens + [tokenid]
-		chatuser.lastrefreshlist = chatuser.lastrefreshlist + [datetime.utcnow()]
-		chatuser.lastonline = datetime.utcnow()
-		chatuser.put()
+		chatchannel = getFreeChannel(userid)
 		
 		#get subtitle
 		subtitleData = open("subtitles.txt")
@@ -676,11 +658,11 @@ class MainPage(webapp.RequestHandler):
 			theme = "gadget"
 		
 		#inject template values and render
-		template_values = {'token': token,
+		template_values = {'token': chatchannel.token,
 							'aliaslist': makeAliaslist(True,chatuser.name),
 							'posts': posts,
 							'userid': userid,
-							'tokenid': tokenid,
+							'tokenid': chatchannel.key().name(),
 							'name':chatuser.name,
 							'logouturl':logouturl,
 							'subtitle':subtitle,
@@ -703,7 +685,7 @@ class MainPage(webapp.RequestHandler):
 
 class AdminPage(webapp.RequestHandler):
 	#special admin functions
-	def get(self):
+	def get(self,**kwargs):
 		#authenticate
 		user = users.get_current_user()
 		if not user:
@@ -744,7 +726,8 @@ class AdminPage(webapp.RequestHandler):
 			return declareUpdate(self)
 
 class UploadPage(webapp.RequestHandler):
-	def post(self):
+	@auth
+	def post(self,**kwargs):
 		fileobj = self.request.POST["file"]
 		#internet explorer gives full path, reduce it:
 		filename = urllib.quote_plus(re.sub(r"^.*\\","",fileobj.filename))
@@ -762,20 +745,20 @@ class UploadPage(webapp.RequestHandler):
 		post = "uploaded file: [[" + fullpath+ "]]"
 		if file.type.find("image") != -1:
 			post = "uploaded image:\n[[img@@" + fullpath+ "]]"
-		doPost(post)
+		doPost(post,kwargs["userid"])
 		self.response.out.write(path)
 		#self.response.headers['Content-Type'] = file.type
 		#self.response.headers['Content-Disposition'] = "attachment; filename=" + file.name
 		#self.response.out.write(file.data)
 		
 class DownloadHandler(webapp.RequestHandler):
-	def get(self, id, filename):
+	def get(self, id, filename,**kwargs):
 		file = File.get_by_id(int(id))
 		self.response.headers['Content-Type'] = file.type
 		self.response.out.write(file.data)
 
 class GadgetXMLPage(webapp.RequestHandler):
-	def get(self):
+	def get(self,**kwargs):
 		disableMath = False
 		if self.request.get('disableMath'):
 			disableMath = True
@@ -783,7 +766,8 @@ class GadgetXMLPage(webapp.RequestHandler):
 		return self.response.out.write(template.render('gadget.xml', template_values))
 
 class HelpPage(webapp.RequestHandler):
-	def get(self):
+	@auth
+	def get(self,**kwargs):
 		return self.response.out.write(template.render('help.htm', {
 			'netloc':getNetloc(self),
 			'aliaslist': makeAliaslist(True)
@@ -807,8 +791,7 @@ application = webapp.WSGIApplication([
 									('/help', HelpPage)])
 
 def main():
-	#resolveStragglers()
-	#checkDump()
+	#housekeeping()
 	run_wsgi_app(application)
 
 if __name__ == "__main__":

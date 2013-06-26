@@ -159,12 +159,13 @@ function openChannel(){
 //send any message to server
 function sendMessage(path, data, callback, abort){
 	if(!data) $.post(path);
-	var success = function(response){
-		if(callback) callback(response);
-	};
 	var fail = function(){
 		if(abort) abort();
 		ajaxFail(path);
+	};
+	var success = function(response){
+		if(response == "autherror") return fail();
+		if(callback) callback(response);
 	};
 	$.post(path,data,success).fail(fail);
 }
@@ -198,7 +199,6 @@ var refreshing = false;
 var inRefreshSequence = false; // true even if in the waiting period between refreshes
 var refreshTimeout = null;
 var connectionError = false;
-var authError = false;
 function refreshToken(time, bypass){
 	// bypass: refresh even if in refresh sequence
 	if(refreshing) return;
@@ -209,7 +209,6 @@ function refreshToken(time, bypass){
 	showPreview(true);
 	allowSend(false,"error");
 	connectionError = true;
-	authError = false
 	clearTimeout(refreshTimeout);
 	socket.onclose = function(){};
 	socket.onerror = function(){};
@@ -218,12 +217,7 @@ function refreshToken(time, bypass){
 		refreshing = false;
 		inRefreshSequence = false;
 		var arr = response.split("@@")
-		if(arr.length == 1){
-			//authentication error
-			authError = true;
-			displayNote("Failed to authenticate. You probably logged out. [[Retry@@javascript:clearTimeout(refreshTimeout);refreshToken(1, true);]].");
-			return;
-		}
+
 		setIcon("favicon.ico");
 		document.title = "SavvyChat";		
 		tokenid = arr.shift();
@@ -240,7 +234,6 @@ function refreshToken(time, bypass){
 				//playAlert("error");
 			}
 		}
-		if(authError) return;
 		setIcon("error.ico");
 		refreshing = false;
 		document.title = "! SavvyChat";
@@ -263,7 +256,7 @@ function onClose(){
 		clearTimeout(expectedPosts[post].timeout)
 	}
 	clearTimeout(checkConnectionTimeout);
-	if(connectionError || authError) return;
+	if(connectionError) return;
 	displayNote("Communication channel closed. SavvyChat is attempting to refresh your connection. If this takes longer than about 10 seconds, you should probably [[reload the page@@javascript:closeMessage();location.reload();]].");
 	refreshToken(1);
 }
@@ -271,7 +264,7 @@ function onClose(){
 var suppressChannelFail = false;
 function channelFail(){
 	if(suppressChannelFail) return;
-	if(connectionError || authError) return;
+	if(connectionError) return;
 	displayNote("SavvyChat's communication channel seems slow or flaky. You can use the command `/sync` to manually check for missed messages. Maybe you want to [[refresh the channel connection@@javascript:onClose();]] or [[reload the page@@javascript:closeMessage();location.reload();]]. Click [[here@@javascript:suppressChannelFail=true;]] to make these warnings stop happening.");
 	clearTimeout(checkConnectionTimeout)
 	checkConnectionTimeout = setTimeout("heartbeat();",connectionCheckInterval);
@@ -281,7 +274,7 @@ var suppressAjaxFail = false;
 function ajaxFail(request){
 	if(suppressAjaxFail) return;
 	if(inRefreshSequence) return;
-	if(connectionError || authError) return;
+	if(connectionError) return;
 	var requestText = '';
 	if(request) requestText = ' (`'+request+'`)';
 	displayNote("Some request"+requestText+" failed or timed out. Maybe you want to [[reload the page@@javascript:closeMessage();location.reload();]]. Click [[here@@javascript:suppressAjaxFail=true;]] to make these warnings stop happening.");
