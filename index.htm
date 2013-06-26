@@ -20,7 +20,7 @@
 {% if not disableMath %}
 <script type="text/javascript" src="http://cdn.mathjax.org/mathjax/1.1-latest/MathJax.js">
 MathJax.Hub.Config({
-        extensions: ["tex2jax.js","TeX/AMSmath.js", "TeX/AMSsymbols.js", "TeX/autobold.js","TeX/noUndefined.js"],
+        extensions: ["tex2jax.js","TeX/AMSmath.js", "TeX/AMSsymbols.js", "TeX/noUndefined.js"],
 		{% if gadget %}
 		messageStyle: "none",
 		{% endif %}
@@ -1071,6 +1071,7 @@ function getHTMLfromSavvyCode(savvyCode, domath, handleRecipients){
 	var output = hashstuff(worktext,codehash,mathhash,linkhashname,linkhashurl,true)
 	
 	output = output
+		.replace(/&quot;/g,"\"")
 		.replace(/&lt;/g,"<")
 		.replace(/&gt;/g,">")
 		.replace(/&amp;/g,"&");
@@ -1080,7 +1081,8 @@ function getHTMLfromSavvyCode(savvyCode, domath, handleRecipients){
 		URL = RegExp.$1
 			.replace(/&/g,"&amp;")
 			.replace(/</g,"&lt;")
-			.replace(/\>/g,"&gt;");
+			.replace(/\>/g,"&gt;")
+			.replace(/"/g,"&quot;");
 		softLinkHash.push(addHTTPtoURL(URL));
 		softLinkNameHash.push(URL);
 		return "~S";
@@ -1088,7 +1090,8 @@ function getHTMLfromSavvyCode(savvyCode, domath, handleRecipients){
 	output = output
 		.replace(/&/g,"&amp;")
 		.replace(/</g,"&lt;")
-		.replace(/\>/g,"&gt;");
+		.replace(/\>/g,"&gt;")
+		.replace(/"/g,"&quot;");
 	
 	if(handleRecipients){
 		output = output.replace(/@(\w+)/ig, function(string) {
@@ -1182,8 +1185,8 @@ function addQuotes(savvyCode){
 		content = "<br /"+">";
 	}
 	//is this a spoiler
-	if(/^[\r\n]*&lt; *.*?[\n\r]/.test(content)){
-		content = content.replace(/^[\r\n]*&lt; *(.*?)[\n\r]/,"\r")
+	if(/^[\r\n]*\! *.*?[\n\r]/.test(content)){
+		content = content.replace(/^[\r\n]*\! *(.*?)[\n\r]/,"\r")
 		//this is a spoiler
 
 		return '\r<blockquote class="spoiler"><a onclick="if(this.nextSibling.style.display==&quot;none&quot;){this.nextSibling.style.display=&quot;block&quot;;scrollDown();}else{this.nextSibling.style.display=&quot;none&quot;}return false;" href="">Show/Hide <span class="collapsetitle">' + RegExp.$1 + '</span></a><div style="display:none;">' + content + '</div></blockquote>\r';
