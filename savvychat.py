@@ -34,7 +34,8 @@ AUTODUMPINTERVAL = 24*60*60
 #http://stackoverflow.com/questions/2350454/simplest-way-to-store-a-value-in-google-app-engine-python
 class Global(db.Model):
 	#store miscellaneous strings
-	value = db.StringProperty()
+	value = db.StringProperty(multiline=True)
+	longvalue = db.TextProperty()
 	values = db.StringListProperty()
 
 	@classmethod
@@ -43,7 +44,12 @@ class Global(db.Model):
 		if not value:
 			instance = cls.get_by_key_name(key)
 			if instance:
-				value = instance.value or instance.values
+				if instance.value is not None:
+					value = instance.value
+				elif instance.longvalue is not None:
+					value = instance.longvalue
+				else:
+					value = instance.values
 				memcache.set(key=key, value=value)
 			else:
 				return None
@@ -53,8 +59,9 @@ class Global(db.Model):
 	def set(cls, key, value):
 		memcache.set(key=key, value=value)
 		entity = cls(key_name=key)
-		if type(value) is list: entity.values = value
-		else: entity.value = value
+		if type(value) is list:	entity.values = value
+		elif len(value) < 500: entity.value = value
+		else:	entity.longvalue = value
 		entity.put()
 		return value
 
@@ -74,14 +81,12 @@ class Post(db.Model):
 	date = db.DateTimeProperty(auto_now_add=True)
 
 class Chatuser(db.Model):
-	#this user data is automatically created on first logon
-	userid = db.StringProperty()
 	name = db.StringProperty()
-	email = db.EmailProperty()
+	lowername = db.StringProperty()
 	playtone = db.BooleanProperty(default=False)
 	shiftsend = db.BooleanProperty(default=True)
 	hf = db.BooleanProperty(default=True)
-	lastonline = db.DateTimeProperty()
+	lastonline = db.DateTimeProperty(default=datetime(2000,1,1))
 	
 class File(db.Model):
 	#for file upload
@@ -90,46 +95,37 @@ class File(db.Model):
 	data = db.BlobProperty()
 	date = db.DateTimeProperty(auto_now_add=True)
 
-class Whiteuser(db.Model):
-	#whitelisted users
-	email = db.EmailProperty()
-	name = db.StringProperty()
-
-class Alias(db.Model):
-	#whitelisted users
-	aliastext = db.StringProperty()
-	meaning = db.StringProperty()
-
-def getFreeChannel(userid):
+def getFreeChannel(email):
 	tokenids = fetchTokens()
 	tokenswriteflag = False #did we make changes
 	chatchannel = None
-	for tokenid in tokenids:
+	while tokenids:
+		tokenid = tokenids[0]
 		chatchannel = Chatchannel.get_by_key_name(tokenid)
 		age = TOKENREMOVEAGE+1
 		if chatchannel:
 			age = (datetime.now()-chatchannel.birthday).seconds
 		if age < TOKENRECYCLEAGE and not chatchannel.owner:
-			chatchannel.owner = userid
+			chatchannel.owner = email
 			chatchannel.put()
 			break
 		if age > TOKENREMOVEAGE or not chatchannel.owner:
-			if chatchannel: chatchannel.delete()
+			if chatchannel: db.delete(chatchannel)
 			tokenids = tokenids[1:]
 			tokenswriteflag = True
 		chatchannel = None
 	if not chatchannel:
-		chatchannel = createChannel(userid,tokenids)
+		chatchannel = createChannel(email,tokenids)
 		tokenswriteflag = True
 	if tokenswriteflag: Global.set("tokens", tokenids)
 	return chatchannel
 
-def createChannel(userid,tokenids):
+def createChannel(email,tokenids):
 	tokenid = randint(0,50)
 	while tokenid in tokenids: tokenid += 1
 	chatchannel = Chatchannel(key_name=str(tokenid))
 	chatchannel.token = channel.create_channel(str(tokenid))
-	chatchannel.owner = userid
+	chatchannel.owner = email
 	chatchannel.put()
 	tokenids += [str(tokenid)]
 	return chatchannel
@@ -178,17 +174,18 @@ def call(post,force=False):
 	plaincontent = htmlcontent = post.content
 	TOarray = []
 	for recipient in post.recipients:
-		chatuser = getUserFromName(recipient.title())
-		if chatuser and (force or userOnline(chatuser.userid)):
-			idx = post.recipients.index(chatuser.name.lower())
+		chatuser = getUserFromName(recipient)
+		if chatuser and (force or userOnline(chatuser.key().name())):
+			idx = post.recipients.index(chatuser.name)
 			if post.pendingemails[idx]:
-				TOarray = TOarray + [chatuser.name + ' <' + chatuser.email + '>']
+				TOarray = TOarray + [
+					chatuser.name + ' <' + chatuser.key().name() + '>']
 				post.pendingemails[idx]=False
 	adjustPendingEmails(post)
 	post.put()
 	if TOarray != []:
 		sendMail(to=', '.join(TOarray),
-			subject=getUserFromId(post.author).name+" sent you a message with SavvyChat",
+			subject=post.author+" sent you a message with SavvyChat",
 			body=plaincontent,
 			html=htmlcontent)
 
@@ -245,39 +242,35 @@ def hlog(text):
 	#hacky log
 	doPost(str(text),"hlog")
 	
-def getUserFromId(id):
-	return db.GqlQuery("SELECT * FROM Chatuser WHERE userid='"+id+"'").get()
+def getUserFromEmail(email):
+	return Chatuser.get_by_key_name(email)
 	
 def getUserFromName(name):
-	return db.GqlQuery("SELECT * FROM Chatuser WHERE name='"+name+"'").get()
+	return db.GqlQuery("SELECT * FROM Chatuser WHERE lowername='"+name.lower()+"'").get()
 
 def auth(function):
-	def newfunction(self, **kwargs):
+	def newfunction(requestHandler, **kwargs):
 		#first, authenticate:
 		user = users.get_current_user()
 		if not user:
-			return self.response.out.write("autherror")
-		userid = user.user_id()
-		kwargs["userid"] = userid
-		chatuser = getUserFromId(userid)
+			return requestHandler.response.out.write("autherror")
+		email = user.email().lower()
+		kwargs["email"] = email
+		chatuser = getUserFromEmail(email)
 		if not chatuser:
-			return self.response.out.write("autherror")
-		return function(self,**kwargs)
+			return requestHandler.response.out.write("autherror")
+		kwargs["chatuser"] = chatuser
+		return function(requestHandler,**kwargs)
 	return newfunction
 
-def userOnline(userid):
-	return not not db.GqlQuery("SELECT * FROM Chatchannel WHERE owner='"+userid+"'").get()
+def userOnline(email):
+	return not not db.GqlQuery("SELECT * FROM Chatchannel WHERE owner='"+email+"'").get()
 	
 def makePostObject(post,dontSave=False):
 	if dontSave: id="dontSave"
 	else:id=post.key().id()
 	#convert instance of post class to object ready for JSON
-	author = getUserFromId(post.author)
-	if not author:
-		author = post.author
-	else:
-		author = author.name
-	return {"content":post.content,"author":author,"date":str(time.mktime(post.date.timetuple())),"recipients":post.recipients,"id":id}
+	return {"content":post.content,"author":post.author,"date":str(time.mktime(post.date.timetuple())),"recipients":post.recipients,"id":id}
 
 def doPost(content, author, dontSave=False, recipients=""):		
 	post = Post()
@@ -293,14 +286,14 @@ def doPost(content, author, dontSave=False, recipients=""):
 	if not dontSave:
 		return post.key().id() #id for the post
 
-def declareUpdate(self):
+def declareUpdate(requestHandler):
 	lastDate = datetime.now().date()
-	dateArg = self.request.get('d')
+	dateArg = requestHandler.request.get('d')
 	if dateArg:
 		lastDate = datetime.fromtimestamp(int(dateArg)).date()
 
 	Global.set("lastUpdate",str(lastDate))
-	return self.response.out.write("done")
+	return requestHandler.response.out.write("done")
 
 def dump(startInt, endInt, saveLastDump):
 	if endInt - startInt > 1000000 or endInt <  startInt:
@@ -318,16 +311,12 @@ def dump(startInt, endInt, saveLastDump):
 		if post.date > endDate:
 			break
 		dateString = str(datetime.fromtimestamp(int(time.mktime(post.date.timetuple()))))
-		try:
-			authorString = getUserFromId(post.author).name
-		except AttributeError:
-			authorString = post.author
-		outString += "\n\n" + authorString + " @ " + dateString + ":\n" + post.content
+		outString += "\n\n" + post.author + " @ " + dateString + ":\n" + post.content
 	if(saveLastDump):
 		Global.set("lastDump", str(endInt))
 	return outString
 
-def manualDump(self):
+def manualDump(requestHandler):
 	#make a dump of all posts
 	#get start time
 	try:
@@ -338,97 +327,74 @@ def manualDump(self):
 			return
 		else:
 			startInt = int(time.mktime(firstPost.date.timetuple()))
-	startArg = self.request.get('s')
+	startArg = requestHandler.request.get('s')
 	if startArg:
 		startInt = int(startArg)
 	
 	#get end time
 	endInt = int(time.mktime(datetime.now().timetuple()))
-	endArg = self.request.get('e')
+	endArg = requestHandler.request.get('e')
 	if endArg:
 		endInt = int(endArg)
 
 	saveLastDump = False
-	if self.request.get('l'):
+	if requestHandler.request.get('l'):
 		saveLastDump = True
 
-	self.response.headers['Content-Type'] = "text/plain"
-	return self.response.out.write(dump(startInt, endInt, saveLastDump))
+	requestHandler.response.headers['Content-Type'] = "text/plain"
+	return requestHandler.response.out.write(dump(startInt, endInt, saveLastDump))
 
-def makeWhitelist():
-	whiteusers = []
-	whiteData = db.GqlQuery("SELECT * FROM Whiteuser")
-	for whiteuser in whiteData:
-		whiteusers += [whiteuser.email+" "+whiteuser.name]
-	return '\n'.join(whiteusers)
+def makeUserList():
+	chatuserList = []
+	chatuserQuery = db.GqlQuery("SELECT * FROM Chatuser")
+	for chatuser in chatuserQuery:
+		chatuserList += [chatuser.key().name()+" "+chatuser.name]
+	return '\n'.join(chatuserList)
 
-def modifyWhitelist(self):
+def modifyUsers(requestHandler):
 	#first delete all
-	whiteData = db.GqlQuery("SELECT * FROM Whiteuser")
-	for whiteuser in whiteData:
-		db.delete(whiteuser)
+	chatuserQuery = db.GqlQuery("SELECT * FROM Chatuser")
+	chatusers={}
+	for chatuser in chatuserQuery:
+		chatusers[chatuser.key().name()] = chatuser
 
-	whitelist = self.request.get("whitelist").split('\n')
-	for emailData in whitelist:
+	userList = requestHandler.request.get("userlist").split('\n')
+	usernames = []
+	for emailData in userList:
 		try:
 			email, name = tuple(emailData.rstrip().split(" "))
 		except ValueError:
 			continue
-		whiteuser = Whiteuser()
-		whiteuser.name = name
-		whiteuser.email = email
-		whiteuser.put()
-	return self.response.out.write(makeWhitelist())
+		email = email.lower()
+		if email in chatusers:
+			chatuser = chatusers[email]
+			del chatusers[email]
+		else: chatuser = Chatuser(key_name=email)
+		chatuser.name = name
+		usernames += [name]
+		chatuser.lowername = name.lower()
+		chatuser.put()
 
-def makeAliaslist(onlyChatusers=False,ignoreUser=None):
-	aliases = []
-	if onlyChatusers:
-		chatuserList = []
-		chatuserQuery = db.GqlQuery("SELECT * FROM Chatuser")
-		for chatuser in chatuserQuery:
-			if chatuser.name != ignoreUser:
-				chatuserList += [chatuser.name.lower()]
-				aliases += [chatuser.name.lower()+" "+chatuser.name.lower()]
-	aliasData = db.GqlQuery("SELECT * FROM Alias")
-	for alias in aliasData:
-		if onlyChatusers:
-			aliasusers = alias.meaning.lower().split(",")
-			meaning = ",".join(list(set(chatuserList).intersection(aliasusers)))
-		else:
-			meaning = alias.meaning
-		if meaning != "":
-			aliases += [alias.aliastext+" "+meaning]
-	if onlyChatusers:
-		aliases += ["all "+",".join(chatuserList)]
-	return '\n'.join(aliases)
+	for email in chatusers:
+		db.delete(chatusers[email])
+	Global.set("usernames",usernames)
+	return requestHandler.response.out.write(makeUserList())
 
-def modifyAliases(self):
-#first delete all`
-	aliasData = db.GqlQuery("SELECT * FROM Alias")
-	for alias in aliasData:
-		db.delete(alias)
+def makeAliaslist():
+	aliases = Global.get("aliases")
+	return aliases or ""
 
-	aliaslist = self.request.get("aliaslist").split('\n')
-	for item in aliaslist:
-		try:
-			aliastext, meaning = tuple(item.rstrip().split(" "))
-		except ValueError:
-			continue
-		alias = db.GqlQuery("SELECT * FROM Alias WHERE aliastext='" + aliastext + "'").get()
-		if not alias:
-			alias = Alias()
-		alias.aliastext = aliastext
-		alias.meaning = meaning
-		alias.put()
-	return self.response.out.write(makeAliaslist())
+def modifyAliases(requestHandler):
+	Global.set("aliases",requestHandler.request.get("aliaslist"))
+	return requestHandler.response.out.write(makeAliaslist())
 
-def initNetloc(self):
-	return Global.set("netloc", urlparse.urlsplit(self.request.url)[1])
+def initNetloc(requestHandler):
+	return Global.set("netloc", urlparse.urlsplit(requestHandler.request.url)[1])
 
-def getNetloc(self=None):
+def getNetloc(requestHandler=None):
 	netloc = Global.get("netloc")
 	if not netloc:
-		if self: initNetloc(self)
+		if requestHandler: initNetloc(requestHandler)
 	return netloc
 
 class PostPage(webapp.RequestHandler):
@@ -439,14 +405,14 @@ class PostPage(webapp.RequestHandler):
 		if not recipients: recipients = ""
 		self.response.out.write(str(doPost(
 			self.request.get('p'),
-			kwargs["userid"],
+			kwargs["chatuser"].name,
 			recipients=recipients)))
 
 class callAckPage(webapp.RequestHandler):
 	@auth
 	def post(self,**kwargs):
 		post = Post.get_by_id(int(self.request.get('id')))
-		post.pendingemails[post.recipients.index(getUserFromId(user.user_id()).name.lower())] = False
+		post.pendingemails[post.recipients.index(kwargs["chatuser"].name)] = False
 		adjustPendingEmails(post)
 		post.put()
 		
@@ -513,7 +479,7 @@ class TokenPage(webapp.RequestHandler):
 	@auth
 	def post(self,**kwargs):
 		#this creates a new token, for when an old one expires
-		chatchannel = getFreeChannel(kwargs["userid"])
+		chatchannel = getFreeChannel(kwargs["email"])
 		#serve token
 		self.response.out.write(chatchannel.key().name() + '@@' + chatchannel.token)
 		
@@ -522,8 +488,8 @@ class disconnectPage(webapp.RequestHandler):
 		tokenid = self.request.get('from')
 
 		chatchannel = Chatchannel.get_by_key_name(tokenid)
-		if chatchannel and chatchannel.id:
-			chatuser = getUserFromId(chatchannel.owner)
+		if chatchannel and chatchannel.owner:
+			chatuser = getUserFromEmail(chatchannel.owner)
 			if chatuser:
 				chatuser.lastonline = datetime.now()
 				chatuser.put()
@@ -536,14 +502,8 @@ class disconnectPage(webapp.RequestHandler):
 class OptionsPage(webapp.RequestHandler):
 	@auth
 	def post(self,**kwargs):
-		#authenticate
-		user = users.get_current_user()
-		if not user:
-			return
-		chatuser = getUserFromId(user.user_id())
-		if not chatuser:
-			return
-		typeString = self.request.get('type')
+		chatuser = kwargs["chatuser"]
+		typeString = self.request.get("type")
 		if not typeString:
 			return
 		elif typeString == "tone":
@@ -552,6 +512,7 @@ class OptionsPage(webapp.RequestHandler):
 			chatuser.hf = self.request.get('h') == "true"
 		elif typeString == "shiftsend":
 			chatuser.shiftsend = self.request.get('s') == "true"
+		chatuser.put()
 
 class MainPage(webapp.RequestHandler):
 	def get(self,**kwargs):
@@ -560,29 +521,11 @@ class MainPage(webapp.RequestHandler):
 		if not user:
 			#not logged in, redirect to login page
 			return self.redirect(users.create_login_url(self.request.uri))
-		userid = user.user_id()
 		logouturl = users.create_logout_url(self.request.uri)
-		
-		#check if userid is in DB
-		chatuser = getUserFromId(userid)
-		if chatuser:
-			#user already exists
-			pass
-		else:
-			#not in DB
-			#check against email whitelist
-			whiteuser = db.GqlQuery("SELECT * FROM Whiteuser WHERE email='" + user.email().lower() + "'").get()
-			if whiteuser:
-				#user is in whitelist
-				chatuser = Chatuser()
-				chatuser.userid = userid
-				chatuser.name = whiteuser.name
-				chatuser.email = whiteuser.email
-				chatuser.put()
-				chatuser.lastonline = datetime(2000,1,1) #so we load every message for them
-			else:
-				#not in whitelist
-				return self.response.out.write(template.render('deny.htm', {'logouturl':logouturl}))
+		email = user.email().lower()
+		chatuser = Chatuser.get_by_key_name(email)
+		if not chatuser:
+			return self.response.out.write(template.render('deny.htm', {'logouturl':logouturl}))
 		
 		#get unread posts
 		postsData = db.GqlQuery("SELECT * FROM Post ORDER BY date DESC")
@@ -612,7 +555,7 @@ class MainPage(webapp.RequestHandler):
 			endquerycursor = postsData.cursor() #but it's inefficient to keep overwriting the cursor...
 			showarchive = False
 		
-		chatchannel = getFreeChannel(userid)
+		chatchannel = getFreeChannel(email)
 		
 		#get subtitle
 		subtitleData = open("subtitles.txt")
@@ -625,8 +568,7 @@ class MainPage(webapp.RequestHandler):
 		hf = chatuser.hf
 		
 		#get topic
-		topic = Global.get('topic')
-		if not topic: topic = "Welcome to SavvyChat!"
+		topic = Global.get('topic') or "Welcome to SavvyChat!"
 
 		lastUpdate = Global.get("lastUpdate")
 		if not lastUpdate:
@@ -634,17 +576,11 @@ class MainPage(webapp.RequestHandler):
 		else:
 			lastUpdate = " Last updated on " + lastUpdate + "."
 
-		disableMath = False
-		if self.request.get('disableMath'):
-			disableMath = True
+		disableMath = not not self.request.get('disableMath')
 		
-		suppressErrors = False
-		if self.request.get('suppressErrors'):
-			suppressErrors = True
+		suppressErrors = not not self.request.get('suppressErrors')
 
-		theme = self.request.get('theme')
-		if not theme:
-			theme = "white"
+		theme = self.request.get('theme') or "white"
 		
 		gadget = False
 		v = ""
@@ -659,9 +595,9 @@ class MainPage(webapp.RequestHandler):
 		
 		#inject template values and render
 		template_values = {'token': chatchannel.token,
-							'aliaslist': makeAliaslist(True,chatuser.name),
+							'usernames': Global.get("usernames") or [],
+							'aliaslist': makeAliaslist(),
 							'posts': posts,
-							'userid': userid,
 							'tokenid': chatchannel.key().name(),
 							'name':chatuser.name,
 							'logouturl':logouturl,
@@ -705,7 +641,7 @@ class AdminPage(webapp.RequestHandler):
 			return self.response.out.write(template.render('admin.htm', {
 				'lastDump':getLastDump(),
 				'autoDump':autoDump,
-				'whitelist':makeWhitelist(),
+				'userlist':makeUserList(),
 				'aliases':makeAliaslist()
 			}))
 		if typeString == "dump":
@@ -718,8 +654,8 @@ class AdminPage(webapp.RequestHandler):
 			return
 		if typeString == "init":
 			return initNetloc(self)
-		if typeString == "white":
-			return modifyWhitelist(self)
+		if typeString == "users":
+			return modifyUsers(self)
 		if typeString == "aliases":
 			return modifyAliases(self)
 		if typeString == "date":
@@ -745,7 +681,7 @@ class UploadPage(webapp.RequestHandler):
 		post = "uploaded file: [[" + fullpath+ "]]"
 		if file.type.find("image") != -1:
 			post = "uploaded image:\n[[img@@" + fullpath+ "]]"
-		doPost(post,kwargs["userid"])
+		doPost(post,kwargs["chatuser"].name)
 		self.response.out.write(path)
 		#self.response.headers['Content-Type'] = file.type
 		#self.response.headers['Content-Disposition'] = "attachment; filename=" + file.name
@@ -770,7 +706,7 @@ class HelpPage(webapp.RequestHandler):
 	def get(self,**kwargs):
 		return self.response.out.write(template.render('help.htm', {
 			'netloc':getNetloc(self),
-			'aliaslist': makeAliaslist(True)
+			'aliaslist': makeAliaslist()
 		}))
 		
 application = webapp.WSGIApplication([

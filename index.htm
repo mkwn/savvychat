@@ -37,7 +37,7 @@ MathJax.Hub.Config({
 <script type="text/javascript">
 var token = '{{ token }}';
 var tokenid = '{{ tokenid }}';
-var userid = '{{ userid }}';
+var usernames = ["{{ usernames|join:"\",\""}}"]
 var username = '{{ name }}';
 {% if playTone %}var playTone = true;{% else %}var playTone = false;{% endif %}
 {% if gadget %}var gadget = true;{% else %}var gadget = false;{% endif %}
@@ -354,7 +354,7 @@ if (!('indexOf' in Array.prototype)) {
 
 function gotCalled(post){
 	if(post.recipients&&post.recipients.length!=0){
-		if(post.recipients.indexOf(username.toLowerCase())!=-1){
+		if(post.recipients.indexOf(username)!=-1){
 			return true;
 		}
 	}
@@ -837,7 +837,7 @@ function receivePost(post,prepend,notification){
 	}
 	var parsedDate = formatDate(postdate);
 	var classtext = notification||post.id=="dontSave"?" notifypost":"";
-	if(gotCalled(post)&&post.author.toLowerCase()!=username.toLowerCase()){
+	if(gotCalled(post)&&post.author!=username){
 		classtext = ' callpost';
 	}
 	var quoteHTML = '<a>'+parsedDate+'</a>';
@@ -1026,7 +1026,7 @@ function showPreview(ignoreCache){
 
 var recipients = [];
 function makeRecipientsText(recipients){
-	return recipients.join(", ").replace(/\w[^, ]*/g,function(txt){return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();});
+	return recipients.join(", ");
 }
 
 function addHTTPtoURL(URL){
@@ -1088,16 +1088,13 @@ function getHTMLfromSavvyCode(savvyCode, domath, handleRecipients){
 	
 	if(handleRecipients){
 		output = output.replace(/@(\w+)/ig, function(string) {
-			var user = string.substr(1).toLowerCase();
+			var tagname = string.substr(1)
 			var highlight = false;
-			for(var alias in aliases){
-				if(aliases[alias].aliastext == user){
-					recipients = $().union(recipients,aliases[alias].meaning.split(","));
-					highlight = true;
-					break;
-				}
+			decodedObj = decodeAliases(recipients.concat([tagname]));
+			if(decodedObj.matched){
+				recipients = decodedObj.decoded;
+				return '<span class="user">'+string+"</span>";
 			}
-			if(highlight) return '<span class="user">'+string+"</span>";
 			return string;
 		});
 	}
@@ -1247,6 +1244,11 @@ function checkKeys(e){
 	if(e.ctrlKey && character == 'b'){
 		//bold
 		insertAroundCursor(document.getElementById('composefield'), "**");
+		return stopBubble(e);
+	}
+	if(e.ctrlKey && character == 'm'){
+		//bold
+		insertAroundCursor(document.getElementById('composefield'), "$$");
 		return stopBubble(e);
 	}
 	if(e.ctrlKey && character == 'q'){
@@ -1494,6 +1496,28 @@ function unmarquee(){
 	document.getElementById('topic').scrollLeft = 0;
 }
 
+function decodeAliases(encoded){
+	var decoded = [];
+	for(var name in encoded){
+		var matched = false;
+		for (i in usernames){
+			if (encoded[name].toLowerCase() == usernames[i].toLowerCase() && encoded[name].toLowerCase() != username.toLowerCase()){
+				decoded = $().union(decoded,[usernames[i]]);
+				matched = true;
+				break;
+			}
+		}
+		if(!matched) for(var alias in aliases){
+			if(aliases[alias].aliastext.toLowerCase() == encoded[name].toLowerCase()){
+				decoded = $().union(decoded,aliases[alias].meaning);
+				matched = true;
+				break;
+			}
+		}
+	}
+	return {decoded:decoded,matched:matched};
+}
+
 function onLoadBody(){
 	//this is the stuff we want to call after all the page has been loaded
 
@@ -1504,10 +1528,12 @@ function onLoadBody(){
 
 	MJQT("dummy");//hack to fix a mathjax bug
 
-	var aliasesData=$("#aliaslist").text().toLowerCase().split("\n");
+	var aliasesData = $("#aliaslist").text().split("\n");
 	for(var alias in aliasesData){
 		aliasData = aliasesData[alias].split(" ");
-		aliases.push({aliastext:aliasData[0],meaning:aliasData[1]});
+		var aliastext = aliasData[0];
+		var meaning = decodeAliases(aliasData[1].split(",")).decoded;
+		aliases.push({aliastext:aliastext,meaning:meaning});
 	}
 		
 	//display all the elements that were hidden while loading

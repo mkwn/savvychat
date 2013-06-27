@@ -40,11 +40,11 @@ border-width:3px;
 			<h1>SavvyChat admin options</h1>
 		</div>
 		<div style="padding:10px;text-align:left;background-color:#EEE;">
-			<h3>Modify whitelist</h3>
-				<p>Each line should be of the form <span class="code">email name</span><textarea id="whitelist" style="width:474px;height:200px;">{{ whitelist }}</textarea>
-				<a href="#" id="white">Update</a>
+			<h3>Modify user list</h3>
+				<p>Each line should be of the form <span class="code">email name</span><textarea id="userlist" style="width:474px;height:200px;">{{ userlist }}</textarea>
+				<a href="#" id="users">Update</a>
 			<h3>Modify aliases</h3>
-				<p>Each line should be of the form <span class="code">alias meaning</span>, where <span class="code">meaning</span> is a comma-separated list of names<textarea id="aliaslist" style="width:474px;height:200px;">{{ aliases }}</textarea>
+				<p>Each line should be of the form <span class="code">alias meaning</span>, where <span class="code">meaning</span> is a comma-separated list of names or previously defined aliases. Aliases should be one word and not contain any symbols that have syntactic meaning in SavvyChat.<textarea id="aliaslist" style="width:474px;height:200px;">{{ aliases }}</textarea>
 				<a href="#" id="aliases">Update</a>
 			<h3>Autodump recipients</h3>
 				<p>Space-separated list of emails: <input id="recipients" type="text" value="{{ autoDump }}" style="width:250px;" />
@@ -88,7 +88,7 @@ function newOption(name,data,callback){
 
 newOption("init",function(){return {};},function(){});
 var qq;
-newOption("white",function(){return {whitelist:$("#whitelist").val()};},function(response){qq=response;$("#whitelist").val(response);});
+newOption("users",function(){return {userlist:$("#userlist").val()};},function(response){qq=response;$("#userlist").val(response);});
 
 newOption("aliases",function(){return {aliaslist:$("#aliaslist").val()};},function(response){$("#aliaslist").val(response)});
 

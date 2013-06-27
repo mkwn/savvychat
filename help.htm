@@ -43,7 +43,7 @@ MathJax.Hub.Config({
 <li>You can include an image in your post with the code <span class="code">[[img@@url.com]].</span></li>
 </ul>
 
-Keyboard shortcuts include ctrl+b for bold, ctrl+i for italics and ctrl+q for quote.</p>
+Keyboard shortcuts include ctrl+b for bold, ctrl+i for italics, ctrl+m for math and ctrl+q for quote.</p>
 
 <p>You have the ability to address your post to specific people by including the code <span class="code">@name</span>. The post will appear red for them, and if their window doesn't have focus, they will hear a tone (even if they have turned the alert tone off, unless they are using the <span class="code">/mute</span> option). If they are not online, an email will be sent to them.</p>Here are the valid aliases for the existing users (case insensitive):
 
@@ -68,10 +68,8 @@ for (var j=0;j<100;j++){
 	}
 	theseAliases.reverse();
 	var meaningText = "";
-	if(meaning.indexOf(",")!=-1)
-		meaningText = ": "+meaning
-			.replace(/,/g,", ")
-			.replace(/\w[^, ]*/g,function(txt){return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();});
+	meaningText = ": "+meaning
+		.replace(/,/g,", ")
 	document.write("<li>@"+theseAliases.join("/@")+meaningText+"</li>");
 }
 </script></ul></p>
