@@ -99,8 +99,7 @@ def getFreeChannel(email):
 	tokenids = fetchTokens()
 	tokenswriteflag = False #did we make changes
 	chatchannel = None
-	while tokenids:
-		tokenid = tokenids[0]
+	for i,tokenid in enumerate(tokenids):
 		chatchannel = Chatchannel.get_by_key_name(tokenid)
 		age = TOKENREMOVEAGE+1
 		if chatchannel:
@@ -111,7 +110,7 @@ def getFreeChannel(email):
 			break
 		if age > TOKENREMOVEAGE or not chatchannel.owner:
 			if chatchannel: db.delete(chatchannel)
-			tokenids = tokenids[1:]
+			tokenids = tokenids[:i]+tokenids[i+1:]
 			tokenswriteflag = True
 		chatchannel = None
 	if not chatchannel:
@@ -141,10 +140,9 @@ def delToken(chatuser, idx):
 		del chatuser.tokens[idx]
 	except IndexError: pass
 
-def broadcast(post,dontSave=False):
+def broadcast(message):
 	#send a message to everyone who is online
 	tokens = fetchTokens()
-	message = simplejson.dumps(makePostObject(post,dontSave))
 	for token in tokens:
 		channel.send_message(token, message)
 
@@ -282,7 +280,8 @@ def doPost(content, author, dontSave=False, recipients=""):
 		post.pendingemails = [True]*len(post.recipients)
 		call(post)
 		post.put()
-	broadcast(post,dontSave)
+	message = simplejson.dumps(makePostObject(post,dontSave))
+	broadcast(message)
 	if not dontSave:
 		return post.key().id() #id for the post
 
@@ -397,7 +396,7 @@ def getNetloc(requestHandler=None):
 		if requestHandler: initNetloc(requestHandler)
 	return netloc
 
-class PostPage(webapp.RequestHandler):
+class PostHandler(webapp.RequestHandler):
 	@auth
 	def post(self,**kwargs):
 		#called on recieving a post
@@ -408,7 +407,7 @@ class PostPage(webapp.RequestHandler):
 			kwargs["chatuser"].name,
 			recipients=recipients)))
 
-class callAckPage(webapp.RequestHandler):
+class CallAckHandler(webapp.RequestHandler):
 	@auth
 	def post(self,**kwargs):
 		post = Post.get_by_id(int(self.request.get('id')))
@@ -416,7 +415,7 @@ class callAckPage(webapp.RequestHandler):
 		adjustPendingEmails(post)
 		post.put()
 		
-class RetrievePage(webapp.RequestHandler):
+class ArchiveHandler(webapp.RequestHandler):
 	#there is a request for more of the post archive
 	@auth
 	def post(self,**kwargs):
@@ -438,7 +437,7 @@ class RetrievePage(webapp.RequestHandler):
 		message = simplejson.dumps({'posts':posts,'cursor':querycursor,'showarchive':showarchive})
 		self.response.out.write(message)
 
-class SyncPage(webapp.RequestHandler):
+class SyncHandler(webapp.RequestHandler):
 	@auth
 	def post(self,**kwargs):
 		#there is a request for a sync since last time
@@ -460,7 +459,7 @@ class SyncPage(webapp.RequestHandler):
 		message = simplejson.dumps({'posts':posts,'cursor':startcursor})
 		self.response.out.write(message)
 
-class PingPage(webapp.RequestHandler):
+class PingHandler(webapp.RequestHandler):
 	@auth
 	def post(self,**kwargs):
 		tokenid = self.request.get('t')
@@ -468,22 +467,30 @@ class PingPage(webapp.RequestHandler):
 			channel.send_message(tokenid, simplejson.dumps({"ping":"ping"}))
 			return self.response.out.write("ping")
 
-class HeartbeatPage(webapp.RequestHandler):
+class HeartbeatHandler(webapp.RequestHandler):
 	def post(self,**kwargs):
 		tokenid = self.request.get('t')
 		if tokenid:
 			channel.send_message(tokenid, simplejson.dumps({"heartbeat":"heartbeat"}))
 			self.response.out.write("heartbeat")
 		
-class TokenPage(webapp.RequestHandler):
+class TokenHandler(webapp.RequestHandler):
 	@auth
 	def post(self,**kwargs):
 		#this creates a new token, for when an old one expires
 		chatchannel = getFreeChannel(kwargs["email"])
 		#serve token
 		self.response.out.write(chatchannel.key().name() + '@@' + chatchannel.token)
+
+class TopicHandler(webapp.RequestHandler):
+	@auth
+	def post(self,**kwargs):
+		topic = self.request.get('t')
+		Global.set("topic",topic)
+		broadcast(simplejson.dumps({"topic":topic}))
+		#return self.response.out.write("done")
 		
-class disconnectPage(webapp.RequestHandler):
+class DisconnectHandler(webapp.RequestHandler):
 	def post(self,**kwargs):
 		tokenid = self.request.get('from')
 
@@ -499,7 +506,7 @@ class disconnectPage(webapp.RequestHandler):
 		#gotta do this stuff somewhere
 		housekeeping()
 		
-class OptionsPage(webapp.RequestHandler):
+class OptionsHandler(webapp.RequestHandler):
 	@auth
 	def post(self,**kwargs):
 		chatuser = kwargs["chatuser"]
@@ -661,7 +668,7 @@ class AdminPage(webapp.RequestHandler):
 		if typeString == "date":
 			return declareUpdate(self)
 
-class UploadPage(webapp.RequestHandler):
+class UploadHandler(webapp.RequestHandler):
 	@auth
 	def post(self,**kwargs):
 		fileobj = self.request.POST["file"]
@@ -711,16 +718,17 @@ class HelpPage(webapp.RequestHandler):
 		
 application = webapp.WSGIApplication([
 									('/', MainPage),
-									('/post', PostPage),
-									('/callack', callAckPage),
-									('/retrieve', RetrievePage),
-									('/sync', SyncPage),
-									('/ping', PingPage),
-									('/heartbeat', HeartbeatPage),
-									('/_ah/channel/disconnected/', disconnectPage),
-									('/options', OptionsPage),
-									('/token', TokenPage),
-									('/upload', UploadPage),
+									('/post', PostHandler),
+									('/callack', CallAckHandler),
+									('/retrieve', ArchiveHandler),
+									('/sync', SyncHandler),
+									('/ping', PingHandler),
+									('/heartbeat', HeartbeatHandler),
+									('/_ah/channel/disconnected/', DisconnectHandler),
+									('/options', OptionsHandler),
+									('/token', TokenHandler),
+									('/topic', TopicHandler),
+									('/upload', UploadHandler),
 									('/admin', AdminPage),
 									('/download/(\d+)/(.*)', DownloadHandler),
 									('/gadget\\.xml', GadgetXMLPage),
