@@ -1,0 +1,1 @@
+<img src='https://savvychat.googlecode.com/files/savvyChatScreen1.png' alt='screenshot' />
